@@ -1,0 +1,9 @@
+{
+  "name": "anchor",
+  "description": "A context companion plugin for Claude Code — persistent memory of decisions, specs, and architectural constraints across sessions.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nilanjan R"
+  },
+  "skills": ["./skills/seed", "./skills/companion"]
+}
