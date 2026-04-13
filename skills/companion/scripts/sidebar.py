@@ -49,6 +49,49 @@ captures = []  # planning mode captures
 uml_deltas = []  # implementation mode file changes
 conflicts = []  # pending conflict alerts
 
+# ── Capture persistence ──────────────────────────────────────────────────────
+
+_spec_location = None
+
+
+def get_spec_location():
+    global _spec_location
+    if _spec_location is None:
+        try:
+            pointer = Path(os.getcwd()) / ".companion" / "product.json"
+            ref = json.loads(pointer.read_text())
+            config = json.loads(Path(ref["config"]).read_text())
+            _spec_location = Path(config["spec_location"])
+        except Exception:
+            pass
+    return _spec_location
+
+
+def persist_capture(item: dict, session_id: str):
+    """Append a capture to <spec_location>/openspec/changes/<session-id>/incremental.json."""
+    spec_loc = get_spec_location()
+    if not spec_loc or not session_id:
+        return
+    changes_dir = spec_loc / "openspec" / "changes" / session_id
+    changes_dir.mkdir(parents=True, exist_ok=True)
+    inc_path = changes_dir / "incremental.json"
+
+    data = {"session_id": session_id, "captures": [], "plan_impact": []}
+    if inc_path.exists():
+        try:
+            data = json.loads(inc_path.read_text())
+        except Exception:
+            pass
+
+    source = item.get("source", "incremental")
+    if source == "plan_impact":
+        data.setdefault("plan_impact", []).append(item)
+    else:
+        data.setdefault("captures", []).append(item)
+
+    inc_path.write_text(json.dumps(data, indent=2))
+
+
 # ── LLM calls ─────────────────────────────────────────────────────────────────
 
 
@@ -203,6 +246,37 @@ Keep everything at product/architecture level — no implementation details.
     "accepted_cost": "only for tradeoffs"
   }
 ]"""
+
+
+PLAN_IMPACT_SYSTEM = """You are analyzing a finalized plan against an existing canonical spec.
+The plan was just approved and will drive implementation.
+Your job: tell the developer what THIS PLAN MEANS for the spec.
+
+For each architectural decision or rule in the plan, classify it as:
+- "add": new rule/constraint/tradeoff not in the spec
+- "modify": changes or refines an existing spec rule (include what the spec currently says)
+- "conflict": directly contradicts a non-negotiable or existing rule
+
+Return ONLY a JSON array. Return [] if the plan is purely tactical (no spec-level impact).
+
+[
+  {
+    "classification": "add | modify | conflict",
+    "module": "which spec module this affects",
+    "type": "business_rule | non_negotiable | tradeoff | decision",
+    "text": "what the plan is saying",
+    "existing_rule": "the spec rule this modifies/conflicts with (null for add)",
+    "severity": "info | warning | violation",
+    "evidence": "brief quote from the plan"
+  }
+]
+
+Rules:
+- Stay at product/architecture level. No implementation details.
+- Only flag "conflict" if the plan clearly contradicts a non-negotiable or established rule.
+- "modify" means the plan refines an existing rule, not trivially restates it.
+- If the plan is just "implement feature X using tool Y", that's tactical — return [].
+- severity: "info" for add, "warning" for modify, "warning" or "violation" for conflict."""
 
 
 def extract_incremental(transcript_path: str, loaded_modules: list[str]) -> list[dict]:
@@ -371,9 +445,10 @@ def handle_conflict_action(conflict: dict, action: str, reason: str, cwd: str):
             if cp_path.exists():
                 data = json.loads(cp_path.read_text())
                 pending = data.get("conflicts", [])
-            pending.append(
-                {**conflict, "recorded_at": datetime.now().isoformat(), "status": "pending"}
-            )
+            entry = {**conflict, "recorded_at": datetime.now().isoformat(), "status": "pending"}
+            if reason:
+                entry["note"] = reason
+            pending.append(entry)
             cp_path.write_text(
                 json.dumps(
                     {
@@ -384,7 +459,10 @@ def handle_conflict_action(conflict: dict, action: str, reason: str, cwd: str):
                     indent=2,
                 )
             )
-            console.print("[dim]  → recorded in conflicts_pending.json[/dim]")
+            if reason:
+                console.print(f"[dim]  → recorded with note: {reason[:80]}[/dim]")
+            else:
+                console.print("[dim]  → recorded in conflicts_pending.json[/dim]")
         except Exception as e:
             log_error(f"Record conflict error: {e}")
 
@@ -454,40 +532,34 @@ def handle_conflict_action(conflict: dict, action: str, reason: str, cwd: str):
 
 
 def render_planning(ts: str, new_captures: list[dict], new_conflicts: list[dict]):
-    """Append planning mode output."""
+    """Render only the NEW captures from this extraction, not the full history."""
     if new_captures:
-        console.print(f"\n[bold]── {len(captures)} captures ──────────────────────[/bold]")
-
-        decisions = [c for c in captures if c["type"] == "decision"]
-        rules = [c for c in captures if c["type"] in ("business_rule", "non_negotiable")]
-        tradeoffs = [c for c in captures if c["type"] == "tradeoff"]
-        ruled_out = [c for c in captures if c["type"] == "ruled_out"]
+        decisions = [c for c in new_captures if c.get("type") == "decision"]
+        rules = [c for c in new_captures if c.get("type") in ("business_rule", "non_negotiable")]
+        tradeoffs = [c for c in new_captures if c.get("type") == "tradeoff"]
+        ruled_out = [c for c in new_captures if c.get("type") == "ruled_out"]
 
         if decisions:
-            console.print("[bold green]✅  Decisions[/bold green]")
-            for c in decisions[-5:]:
+            for c in decisions:
                 flag = " [yellow]?[/yellow]" if c.get("agreement_type") == "implicit" else ""
-                console.print(f"  [green]•[/green] {c['text']}{flag}")
+                console.print(f"  [green]•[/green] {c.get('text', '')}{flag}")
                 if c.get("agreement_type") == "implicit":
                     console.print("    [dim]implicit — confirm?[/dim]")
 
         if rules:
-            console.print("[bold blue]📌  Rules & constraints[/bold blue]")
-            for c in rules[-4:]:
-                icon = "🔒" if c["type"] == "non_negotiable" else "📌"
-                console.print(f"  {icon} {c['text']}")
+            for c in rules:
+                icon = "🔒" if c.get("type") == "non_negotiable" else "📌"
+                console.print(f"  {icon} {c.get('text', '')}")
 
         if tradeoffs:
-            console.print("[bold yellow]⚖️   Tradeoffs[/bold yellow]")
-            for c in tradeoffs[-3:]:
-                console.print(f"  [yellow]•[/yellow] {c['text']}")
+            for c in tradeoffs:
+                console.print(f"  [yellow]⚖️[/yellow]  {c.get('text', '')}")
                 if c.get("accepted_cost"):
                     console.print(f"    [dim]cost: {c['accepted_cost']}[/dim]")
 
         if ruled_out:
-            console.print("[bold dim]❌  Ruled out[/bold dim]")
-            for c in ruled_out[-2:]:
-                console.print(f"  [dim]• {c['text']}[/dim]")
+            for c in ruled_out:
+                console.print(f"  [dim]❌ {c.get('text', '')}[/dim]")
 
         console.print()
 
@@ -500,13 +572,73 @@ def render_planning(ts: str, new_captures: list[dict], new_conflicts: list[dict]
                 f"[{color}]{conflict.get('explanation', '')}[/{color}]\n\n"
                 f"[dim]Existing rule:[/dim] {conflict.get('existing_rule', '')}\n"
                 f"[dim]Module:[/dim] {conflict.get('module', '')}\n\n"
-                f"[bold]Action: [[s]nooze / [r]ecord / [o]verride][/bold]",
+                f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
                 title=f"[bold {color}]⚠️  CONFLICT[/bold {color}]",
                 border_style=color,
                 box=box.ROUNDED,
             )
         )
         conflicts.append(conflict)
+
+
+def render_plan_impact(adds: list[dict], modifies: list[dict], confs: list[dict]):
+    """Render the spec-impact analysis after plan-complete.
+
+    Three buckets:
+      - adds: new rules/decisions introduced by the plan (green)
+      - modifies: changes/refinements to existing spec rules (yellow)
+      - confs: conflicts with existing rules / non-negotiables (red)
+    """
+    ts = datetime.now().strftime("%H:%M:%S")
+    console.print(f"\n[bold]{ts} ✓ plan complete · impact analysis[/bold]\n")
+
+    if adds:
+        # group by module
+        by_mod: dict[str, list[dict]] = {}
+        for item in adds:
+            by_mod.setdefault(item.get("module", "unknown"), []).append(item)
+        for mod, items in by_mod.items():
+            console.print(f"[bold green]+ adds to {mod}[/bold green]")
+            for item in items:
+                console.print(f"  [green]•[/green] [{item.get('type', 'decision')}] {item.get('text', '')}")
+
+    if modifies:
+        by_mod = {}
+        for item in modifies:
+            by_mod.setdefault(item.get("module", "unknown"), []).append(item)
+        for mod, items in by_mod.items():
+            console.print(f"\n[bold yellow]~ modifies {mod}[/bold yellow]")
+            for item in items:
+                console.print(f"  [yellow]•[/yellow] {item.get('text', '')}")
+                existing = item.get("existing_rule")
+                if existing:
+                    console.print(f"    [dim]was:[/dim] {existing}")
+
+    if confs:
+        by_mod = {}
+        for item in confs:
+            by_mod.setdefault(item.get("module", "unknown"), []).append(item)
+        for mod, items in by_mod.items():
+            console.print(f"\n[bold red]⚠ conflicts with {mod}[/bold red]")
+            for item in items:
+                severity = item.get("severity", "warning")
+                color = "red" if severity == "violation" else "yellow"
+                console.print(
+                    Panel(
+                        f"[{color}]Plan says:[/{color}] {item.get('text', '')}\n"
+                        f"[dim]Existing rule ({item.get('type', 'rule')}):[/dim] {item.get('existing_rule', '')}\n"
+                        f"[dim]Evidence:[/dim] {item.get('evidence', '')}\n\n"
+                        f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
+                        title=f"[bold {color}]⚠️  CONFLICT[/bold {color}]",
+                        border_style=color,
+                        box=box.ROUNDED,
+                    )
+                )
+                # Also add to global conflicts list so the input listener can act on it
+                with lock:
+                    conflicts.append(item)
+
+    console.print()
 
 
 def render_implementation(file_path: str, alert: dict | None):
@@ -531,7 +663,7 @@ def render_implementation(file_path: str, alert: dict | None):
                     f"[{color}]{alert.get('evidence', '')}[/{color}]\n\n"
                     f"[dim]Rule violated:[/dim] {alert.get('violation', '')}\n"
                     f"[dim]Module:[/dim] {alert.get('module', '')}\n\n"
-                    f"[bold]Action: [[s]nooze / [r]ecord / [o]verride][/bold]",
+                    f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
                     title=f"[bold {color}]⚠️  SPEC VIOLATION[/bold {color}]",
                     border_style=color,
                     box=box.ROUNDED,
@@ -545,30 +677,31 @@ def render_implementation(file_path: str, alert: dict | None):
 
 
 def handle_stop(event: dict):
-    mode = event.get("mode", "planning")
     transcript = event.get("transcript_path")
     loaded_modules = event.get("loaded_modules", [])
     cwd = event.get("cwd", os.getcwd())
-
-    if mode != "planning":
-        return
 
     ts = datetime.now().strftime("%H:%M:%S")
     console.print(f"[dim]{ts} ← stop event, extracting...[/dim]")
 
     new_items = extract_incremental(transcript, loaded_modules)
     if not new_items:
+        console.print("[dim]  · nothing new[/dim]")
         return
 
+    session_id = event.get("session_id", "")
     added = 0
     for item in new_items:
         if isinstance(item, dict) and item.get("type"):
             item["captured_at"] = datetime.now().isoformat()
+            item["source"] = "incremental"
             with lock:
                 captures.append(item)
+            persist_capture(item, session_id)
             added += 1
 
     if not added:
+        console.print("[dim]  · nothing new[/dim]")
         return
 
     ts = datetime.now().strftime("%H:%M:%S")
@@ -597,9 +730,67 @@ def handle_post_tool_use(event: dict):
 
 def handle_exit_plan_mode(event: dict):
     ts = datetime.now().strftime("%H:%M:%S")
-    console.print(f"\n[dim]{ts} ← plan complete, running deep extraction...[/dim]")
-    # mode flip happens in exit_plan_mode.py hook
-    # deep extraction happens at session_end
+    plan = (event.get("plan", "") or "").strip()
+    loaded_modules = event.get("loaded_modules", []) or []
+    cwd = event.get("cwd", os.getcwd())
+
+    if not plan:
+        console.print(
+            f"\n[dim]{ts} ← plan complete (no plan content) · implementation mode active[/dim]\n"
+        )
+        return
+
+    console.print(f"\n[dim]{ts} ← plan complete, analyzing impact on spec...[/dim]")
+
+    # Load spec context for the prompt
+    specs = load_all_specs(cwd, loaded_modules) if loaded_modules else {}
+    if specs:
+        compact_specs = {
+            name: {
+                "summary": s.get("summary", ""),
+                "business_rules": s.get("business_rules", []),
+                "non_negotiables": s.get("non_negotiables", []),
+                "tradeoffs": s.get("tradeoffs", []),
+            }
+            for name, s in specs.items()
+        }
+        spec_context = json.dumps(compact_specs, indent=2)
+    else:
+        spec_context = "{}"
+
+    prompt = (
+        f"Canonical spec (loaded modules):\n{spec_context}\n\n"
+        f"Finalized plan:\n{plan}\n\n"
+        "Classify each architectural decision in the plan against the spec."
+    )
+
+    raw = call_claude(prompt, PLAN_IMPACT_SYSTEM)
+    try:
+        items = json.loads(raw) if raw else []
+    except Exception:
+        items = []
+
+    if not isinstance(items, list) or not items:
+        console.print("[dim]  · no spec-level impact[/dim]")
+        console.print("[dim]  Implementation mode active. Watching file changes.[/dim]\n")
+        return
+
+    # Save each item to captures and persist to disk
+    session_id = event.get("session_id", "")
+    for item in items:
+        if isinstance(item, dict):
+            item["captured_at"] = datetime.now().isoformat()
+            item["source"] = "plan_impact"
+            with lock:
+                captures.append(item)
+            persist_capture(item, session_id)
+
+    # Bucket by classification
+    adds = [i for i in items if isinstance(i, dict) and i.get("classification") == "add"]
+    modifies = [i for i in items if isinstance(i, dict) and i.get("classification") == "modify"]
+    confs = [i for i in items if isinstance(i, dict) and i.get("classification") == "conflict"]
+
+    render_plan_impact(adds, modifies, confs)
     console.print("[dim]  Implementation mode active. Watching file changes.[/dim]\n")
 
 
@@ -672,7 +863,12 @@ def conflict_input_listener():
                     conflicts.pop()
 
             elif key == "r":
-                handle_conflict_action(latest, "record", "", cwd)
+                console.print("[dim]  note (enter to skip):[/dim] ", end="")
+                try:
+                    note = input().strip()
+                except EOFError:
+                    note = ""
+                handle_conflict_action(latest, "record", note, cwd)
                 with lock:
                     conflicts.pop()
 
@@ -712,12 +908,10 @@ def get_state() -> dict:
 
 def render_startup(state: dict):
     """Show header + loaded spec context on sidebar startup."""
-    mode = state.get("mode", "planning")
     loaded_modules = state.get("last_loaded_modules", [])
-    mode_color = "green" if mode == "planning" else "yellow"
 
     # build header content
-    header_lines = [f"[{mode_color}]● {mode.upper()}[/{mode_color}]"]
+    header_lines = []
 
     if loaded_modules:
         header_lines.append("")

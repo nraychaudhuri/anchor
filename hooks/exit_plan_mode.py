@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
 PermissionRequest hook — matcher: ExitPlanMode
-Flips mode to implementation. Signals companion for deep extraction pass.
-Approves ExitPlanMode so developer isn't blocked.
-Deep extraction runs async in companion process.
+Relays plan content to companion sidebar for impact analysis.
+Does NOT auto-approve — lets Claude Code show the normal plan approval UI.
 """
 import json
 import os
@@ -18,7 +17,6 @@ def main():
     try:
         data = json.load(sys.stdin)
     except Exception:
-        approve()
         return
 
     # flip mode to implementation
@@ -28,6 +26,17 @@ def main():
         state["mode"] = "implementation"
         with open(STATE_PATH, "w") as f:
             json.dump(state, f, indent=2)
+    except Exception:  # nosec B110
+        pass
+
+    # grab plan content from tool_input + loaded modules from state
+    tool_input = data.get("tool_input", {}) or {}
+    plan = (tool_input.get("plan", "") or "")[:20000]
+
+    loaded_modules = []
+    try:
+        with open(STATE_PATH) as f:
+            loaded_modules = json.load(f).get("last_loaded_modules", [])
     except Exception:  # nosec B110
         pass
 
@@ -42,6 +51,8 @@ def main():
                         "transcript_path": data.get("transcript_path"),
                         "session_id": data.get("session_id"),
                         "cwd": data.get("cwd"),
+                        "plan": plan,
+                        "loaded_modules": loaded_modules,
                     }
                 )
                 + "\n"
@@ -51,22 +62,7 @@ def main():
         except (OSError, BlockingIOError):
             pass
 
-    # approve immediately — don't block developer
-    approve()
-
-
-def approve():
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PermissionRequest",
-                    "decision": {"behavior": "allow"},
-                }
-            }
-        )
-    )
-    sys.exit(0)
+    # Don't output a decision — let Claude Code show the normal plan approval UI
 
 
 if __name__ == "__main__":
