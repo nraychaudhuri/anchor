@@ -58,5 +58,4 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cat /tmp/anchor_project_dir 2>/dev/null || pwd)"
 cd "$PROJECT_DIR"
-clear
 uv run "$SCRIPT_DIR/sidebar.py"

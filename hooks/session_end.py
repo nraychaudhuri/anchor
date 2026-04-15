@@ -60,6 +60,10 @@ def main():
         except (OSError, BlockingIOError):
             pass
 
+    # Remind user in Claude session to close companion terminal
+    print("📌 Remember to close the Anchor companion terminal.", file=sys.stderr)
+    print("📌 Remember to close the Anchor companion terminal.")
+
     sys.exit(0)
 
 

@@ -58,7 +58,7 @@ else:
     if changes_dir.exists():
         for d in changes_dir.iterdir():
             if d.is_dir() and d.name not in checkpoint:
-                if (d / 'incremental.json').exists() or (d / 'extraction.json').exists():
+                if (d / 'incremental.json').exists():
                     unreconciled.append(d.name)
     print(len(unreconciled))
 "
@@ -87,18 +87,54 @@ If 0 or skip → continue to Step 2.
 
 **If modules selected:**
 
-1. Read the spec location:
+1. Read the spec location and existing module names:
 ```bash
 uv run python -c "
 import json
 from pathlib import Path
 ref = json.loads(Path('.companion/product.json').read_text())
 config = json.loads(Path(ref['config']).read_text())
+modules = json.loads(Path('.companion/modules.json').read_text())
+module_names = [m['name'] for m in modules]
 print(config['spec_location'])
+print(','.join(module_names))
 "
 ```
 
-2. For each selected module read:
+2. For each selected module, check if it exists in the module list.
+   If a module does NOT exist, use AskUserQuestion:
+```
+question: "<module> doesn't exist yet. Create it as a new module?"
+options: ["Yes — create it", "Skip — don't load it"]
+```
+   If yes, ask the user for a one-line description, then create it:
+```bash
+uv run python -c "
+import json
+from pathlib import Path
+modules = json.loads(Path('.companion/modules.json').read_text())
+modules.append({'name': '<module>', 'description': '<user description>', 'paths': []})
+Path('.companion/modules.json').write_text(json.dumps(modules, indent=2))
+# Create skeleton spec
+import sys
+ref = json.loads(Path('.companion/product.json').read_text())
+config = json.loads(Path(ref['config']).read_text())
+spec_dir = Path(config['spec_location']) / 'openspec' / 'specs' / '<module>'
+spec_dir.mkdir(parents=True, exist_ok=True)
+(spec_dir / 'spec.json').write_text(json.dumps({
+    'module': '<module>',
+    'summary': '<user description>',
+    'business_rules': [],
+    'non_negotiables': [],
+    'tradeoffs': [],
+    'conflicts': [],
+    'lineage': []
+}, indent=2))
+print('created')
+"
+```
+
+3. For each selected module read:
    `<spec_location>/openspec/specs/<module-name>/spec.json`
 
 3. Save selected modules to state:

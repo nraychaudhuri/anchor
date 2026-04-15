@@ -23,6 +23,7 @@ Conflict actions:
 import asyncio
 import json
 import os
+import sys
 import threading
 import time
 from datetime import datetime
@@ -710,11 +711,23 @@ def render_planning(ts: str, new_captures: list[dict], new_conflicts: list[dict]
     for conflict in new_conflicts:
         severity = conflict.get("severity", "warning")
         color = "red" if severity == "violation" else "yellow"
+        # Look up lineage for the existing rule's origin session
+        lineage_line = ""
+        if conflict.get("module") and conflict.get("existing_rule"):
+            try:
+                spec = load_spec(os.getcwd(), conflict["module"])
+                if spec:
+                    for entry in spec.get("lineage", []):
+                        lineage_line = f"\n[dim]introduced: claude --resume {entry.get('session_id', '')}[/dim]"
+                        break  # show most recent lineage entry
+            except Exception:
+                pass
         console.print(
             Panel(
                 f"[{color}]{conflict.get('explanation', '')}[/{color}]\n\n"
                 f"[dim]Existing rule:[/dim] {conflict.get('existing_rule', '')}\n"
-                f"[dim]Module:[/dim] {conflict.get('module', '')}\n\n"
+                f"[dim]Module:[/dim] {conflict.get('module', '')}"
+                f"{lineage_line}\n\n"
                 f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
                 title=f"[bold {color}]⚠️  CONFLICT[/bold {color}]",
                 border_style=color,
@@ -938,50 +951,56 @@ def handle_exit_plan_mode(event: dict):
 
 
 def handle_session_end(event: dict):
-    transcript = event.get("transcript_path")
     session_id = event.get("session_id", "unknown")
-    cwd = event.get("cwd", os.getcwd())
 
-    console.print("\n[dim]Session ending — running final extraction...[/dim]")
+    # Build session summary from in-memory captures
+    decisions = [c for c in captures if c.get("type") == "decision"]
+    rules = [c for c in captures if c.get("type") in ("business_rule", "non_negotiable")]
+    tradeoffs = [c for c in captures if c.get("type") == "tradeoff"]
+    impact_conflicts = [c for c in captures if c.get("source") == "plan_impact" and c.get("classification") == "conflict"]
 
-    # run mine_sessions.py on this session's transcript
-    if transcript:
-        try:
-            import subprocess
+    summary_lines = []
+    summary_lines.append(
+        f"[bold]{len(captures)} captures[/bold] · "
+        f"{len(decisions)} decisions · {len(rules)} rules · "
+        f"{len(tradeoffs)} tradeoffs · {len(impact_conflicts)} conflicts"
+    )
 
-            pointer = Path(cwd) / ".companion" / "product.json"
-            ref = json.loads(pointer.read_text())
-            config_path = ref["config"]
-            skill_path = Path(__file__).parent.parent.parent / "seed" / "scripts" / "mine_sessions.py"
-            if skill_path.exists():
-                result = subprocess.run(
-                    ["uv", "run", "python", str(skill_path), config_path, transcript],
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                )
-                console.print(f"[dim]  mining: {result.stdout.strip()[:100]}[/dim]")
+    # Show last few key captures
+    recent = captures[-5:] if captures else []
+    if recent:
+        summary_lines.append("")
+        for c in recent:
+            icon = "•" if c.get("type") == "decision" else "📌" if c.get("type") in ("business_rule", "non_negotiable") else "⚖️" if c.get("type") == "tradeoff" else "•"
+            summary_lines.append(f"  {icon} {c.get('text', '')[:80]}")
 
-                # run reconcile
-                reconcile_path = skill_path.parent / "reconcile.py"
-                modules_path = Path(cwd) / ".companion" / "modules.json"
-                if reconcile_path.exists() and modules_path.exists():
-                    result2 = subprocess.run(
-                        ["uv", "run", "python", str(reconcile_path), config_path, str(modules_path)],
-                        capture_output=True,
-                        text=True,
-                        timeout=300,
-                    )
-                    console.print(f"[dim]  reconcile: {result2.stderr.strip()[-200:]}[/dim]")
-                    console.print("[bold green]✓ Spec updated[/bold green]")
-        except Exception as e:
-            console.print(f"[red]  Session end error: {e}[/red]")
-            log_error(f"Session end processing error: {e}")
-            console.print(f"[dim red]  extraction failed: {e}[/dim red]")
+    summary_lines.append("")
+    summary_lines.append(f"[dim]session:[/dim] {session_id}")
+    summary_lines.append(f"[dim]resume:[/dim]  claude --resume {session_id}")
+    summary_lines.append("")
+    summary_lines.append("[dim]saved to incremental.json · will reconcile on next /anchor:companion[/dim]")
 
     console.print()
+    console.print(
+        Panel(
+            "\n".join(summary_lines),
+            title="[bold]session summary[/bold]",
+            border_style="dim",
+            box=box.ROUNDED,
+        )
+    )
+    console.print()
     console.print("[bold]Session complete. You can close this terminal.[/bold]")
-    console.print("[dim]─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⚓[/dim]\n")
+    console.print()
+    console.print("[#d75f00]        ◉[/#d75f00]")
+    console.print("[#d75f00]       ━┿━[/#d75f00]")
+    console.print("[#d75f00]        │[/#d75f00]")
+    console.print("[#d75f00]        │[/#d75f00]")
+    console.print("[#d75f00]    ╭╴  │  ╶╮[/#d75f00]")
+    console.print("[#d75f00]     ╰╮ │ ╭╯[/#d75f00]")
+    console.print("[#d75f00]      ╰─┴─╯[/#d75f00]")
+    console.print()
+    os._exit(0)
     # Exit cleanly so the terminal shows [Process completed]
     os._exit(0)
 
@@ -1102,11 +1121,19 @@ def render_startup(state: dict):
 
 
 def main():
-    w = console.width or 80
-    chain = "─⊃" * ((w - 4) // 2) + "─⚓"
+    # Clear entire screen + move cursor to top — wipes shell login messages
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+
     console.print()
-    console.print("  [bold dark_orange3]Anchor[/bold dark_orange3] [dim]v0.1.0 · context companion[/dim]")
-    console.print(f"[dark_orange3]{chain[:w - 2]}[/dark_orange3]\n")
+    console.print("[#d75f00]        ◉[/#d75f00]")
+    console.print("[#d75f00]       ━┿━[/#d75f00]     [bold #d75f00]Anchor[/bold #d75f00] [dim]v0.1.0[/dim]")
+    console.print("[#d75f00]        │[/#d75f00]      [dim]context companion[/dim]")
+    console.print("[#d75f00]        │[/#d75f00]")
+    console.print("[#d75f00]    ╭╴  │  ╶╮[/#d75f00]")
+    console.print("[#d75f00]     ╰╮ │ ╭╯[/#d75f00]")
+    console.print("[#d75f00]      ╰─┴─╯[/#d75f00]")
+    console.print()
 
     if not os.path.exists(PIPE_PATH):
         os.mkfifo(PIPE_PATH)
