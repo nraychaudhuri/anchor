@@ -32,9 +32,10 @@ def call_claude(prompt: str, system_prompt: str) -> str | None:
         parts = []
         opts = ClaudeAgentOptions(
             system_prompt=system_prompt,
-            allowed_tools=[],
+            tools=[],
             max_turns=1,
             permission_mode="bypassPermissions",
+            extra_args={"setting-sources": ""},
         )
         opts.model = "claude-sonnet-4-6"
         async for msg in query(prompt=prompt, options=opts):
@@ -68,16 +69,42 @@ def call_claude(prompt: str, system_prompt: str) -> str | None:
 
 
 def load_all_extractions(spec_location: Path) -> list[dict]:
-    """Load all extraction.json files from changes/, sorted by date."""
+    """Load all extraction.json AND incremental.json files from changes/, sorted by date."""
     extractions = []
     changes_dir = spec_location / "openspec" / "changes"
     if not changes_dir.exists():
         return []
     for session_dir in sorted(changes_dir.iterdir()):
+        # Load transcript-mined extraction
         f = session_dir / "extraction.json"
         if f.exists():
             try:
                 extractions.append(json.loads(f.read_text()))
+            except Exception:
+                continue
+
+        # Load incremental captures from sidebar
+        inc = session_dir / "incremental.json"
+        if inc.exists():
+            try:
+                inc_data = json.loads(inc.read_text())
+                # Convert incremental captures to extraction format
+                session_id = inc_data.get("session_id", session_dir.name)
+                captures = inc_data.get("captures", [])
+                plan_impact = inc_data.get("plan_impact", [])
+                if captures or plan_impact:
+                    extractions.append({
+                        "has_planning_content": True,
+                        "session_purpose": "Incremental captures from companion sidebar",
+                        "_session_id": session_id,
+                        "_session_date": (captures[0] if captures else plan_impact[0]).get("captured_at", "")[:10],
+                        "business_rules": [c for c in captures if c.get("type") in ("business_rule", "non_negotiable")],
+                        "non_negotiables": [c for c in captures if c.get("type") == "non_negotiable"],
+                        "decisions": [c for c in captures if c.get("type") == "decision"],
+                        "tradeoffs": [c for c in captures if c.get("type") == "tradeoff"],
+                        "module_hints": list({c.get("module", "") for c in plan_impact if c.get("module")}),
+                        "_plan_impact": plan_impact,
+                    })
             except Exception:
                 continue
     extractions.sort(key=lambda x: x.get("_session_date", ""))

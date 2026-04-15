@@ -110,6 +110,7 @@ class MiniSession:
     files: list[dict] = field(default_factory=list)  # [{path, module, ts}] — last 5
     impact: list[dict] = field(default_factory=list)  # plan impact items
     plan_file: str | None = None
+    active_module: str | None = None  # module of most recent file change
     started_at: str = ""
 
 
@@ -135,15 +136,21 @@ def build_chart(mini: MiniSession, loaded_modules: list[str]) -> Panel:
     """Build a Rich Panel showing the current mini session state."""
     lines = []
 
-    # Module sequence
+    # Module sequence with color differentiation
     if mini.module_order:
         mod_parts = []
         for name in mini.module_order:
             status = mini.modules.get(name, "loaded")
             if status == "boundary":
                 mod_parts.append(f"[yellow]{name} ○[/yellow]")
+            elif name == mini.active_module:
+                mod_parts.append(f"[bold green]{name} ●[/bold green]")
             else:
                 mod_parts.append(f"[green]{name} ●[/green]")
+        # Also show loaded but untouched modules dimly
+        for name in loaded_modules:
+            if name not in mini.modules:
+                mod_parts.append(f"[dim]{name}[/dim]")
         lines.append("  " + " ──→ ".join(mod_parts))
         lines.append("")
 
@@ -204,16 +211,23 @@ def update_mini_session(mini: MiniSession, event: dict, loaded_modules: list[str
         else:
             mini.modules[module] = "boundary"
 
-    # Track file (keep last 5)
+    # Track file — dedup by path, update timestamp if already seen
     is_boundary = module and module not in loaded_modules
-    mini.files.append({
-        "path": file_path,
-        "module": module or "unknown",
-        "ts": ts,
-        "alert": is_boundary,
-    })
-    if len(mini.files) > 5:
-        mini.files = mini.files[-5:]
+    existing = next((f for f in mini.files if f["path"] == file_path), None)
+    if existing:
+        existing["ts"] = ts
+    else:
+        mini.files.append({
+            "path": file_path,
+            "module": module or "unknown",
+            "ts": ts,
+            "alert": is_boundary,
+        })
+        if len(mini.files) > 5:
+            mini.files = mini.files[-5:]
+
+    # Track active module for color differentiation
+    mini.active_module = module
 
 
 # ── LLM calls ─────────────────────────────────────────────────────────────────
@@ -409,9 +423,14 @@ def extract_incremental(transcript_path: str, loaded_modules: list[str]) -> list
     if not conversation.strip():
         return []
 
-    existing_text = json.dumps([c["text"] for c in captures[-10:]])
+    existing_text = json.dumps([c.get("text", "") for c in captures[-15:]])
+    existing_conflicts = json.dumps(
+        [c.get("explanation", c.get("text", "")) for c in conflicts[-10:]]
+    )
     raw = call_claude(
-        f"Recent conversation:\n{conversation}\n\nAlready captured:\n{existing_text}",
+        f"Recent conversation:\n{conversation}\n\n"
+        f"Already captured (do NOT re-extract):\n{existing_text}\n\n"
+        f"Already raised as conflicts (do NOT re-raise):\n{existing_conflicts}",
         EXTRACTION_SYSTEM,
     )
     if not raw:
@@ -939,7 +958,7 @@ def handle_session_end(event: dict):
                     ["uv", "run", "python", str(skill_path), config_path, transcript],
                     capture_output=True,
                     text=True,
-                    timeout=120,
+                    timeout=300,
                 )
                 console.print(f"[dim]  mining: {result.stdout.strip()[:100]}[/dim]")
 
@@ -951,7 +970,7 @@ def handle_session_end(event: dict):
                         ["uv", "run", "python", str(reconcile_path), config_path, str(modules_path)],
                         capture_output=True,
                         text=True,
-                        timeout=120,
+                        timeout=300,
                     )
                     console.print(f"[dim]  reconcile: {result2.stderr.strip()[-200:]}[/dim]")
                     console.print("[bold green]✓ Spec updated[/bold green]")
@@ -960,7 +979,11 @@ def handle_session_end(event: dict):
             log_error(f"Session end processing error: {e}")
             console.print(f"[dim red]  extraction failed: {e}[/dim red]")
 
-    console.print("[dim]companion: session closed[/dim]\n")
+    console.print()
+    console.print("[bold]Session complete. You can close this terminal.[/bold]")
+    console.print("[dim]─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⊃─⚓[/dim]\n")
+    # Exit cleanly so the terminal shows [Process completed]
+    os._exit(0)
 
 
 # ── Conflict input listener ───────────────────────────────────────────────────
@@ -1031,17 +1054,14 @@ def get_state() -> dict:
 
 
 def render_startup(state: dict):
-    """Show header + loaded spec context on sidebar startup."""
+    """Show the patient chart: loaded modules + non-negotiables (allergies)."""
     loaded_modules = state.get("last_loaded_modules", [])
 
-    # build header content
     header_lines = []
+    all_non_negs = []
 
     if loaded_modules:
-        header_lines.append("")
-        header_lines.append("[dim]Loaded context:[/dim]")
         for name in loaded_modules:
-            # try to read summary from spec.json
             summary = ""
             try:
                 cwd = os.getcwd()
@@ -1051,7 +1071,9 @@ def render_startup(state: dict):
                 spec_p = Path(config["spec_location"]) / "openspec" / "specs" / name / "spec.json"
                 if spec_p.exists():
                     spec = json.loads(spec_p.read_text())
-                    summary = spec.get("summary", "")[:80]
+                    summary = spec.get("summary", "")
+                    for nn in spec.get("non_negotiables", []):
+                        all_non_negs.append(nn if isinstance(nn, str) else str(nn))
             except Exception:
                 pass
             if summary:
@@ -1059,21 +1081,33 @@ def render_startup(state: dict):
                 header_lines.append(f"  [dim]{summary}[/dim]")
             else:
                 header_lines.append(f"  [bold]{name}[/bold]")
+
+        if all_non_negs:
+            header_lines.append("")
+            header_lines.append("[dim]key points:[/dim]")
+            for nn in all_non_negs[:8]:
+                header_lines.append(f"  [red]🔒[/red] {nn}")
     else:
-        header_lines.append("[dim]no spec loaded — run /companion[/dim]")
+        header_lines.append("[dim]no spec loaded — run /anchor:companion[/dim]")
 
     console.print(
         Panel(
             "\n".join(header_lines),
-            title="[bold]context companion[/bold]",
+            title="[bold]Specs[/bold]",
             border_style="dim",
             box=box.ROUNDED,
         )
     )
-    console.print("[dim]s=snooze  r=record  o=override  (conflicts only)[/dim]\n")
+    console.print()
 
 
 def main():
+    w = console.width or 80
+    chain = "─⊃" * ((w - 4) // 2) + "─⚓"
+    console.print()
+    console.print("  [bold dark_orange3]Anchor[/bold dark_orange3] [dim]v0.1.0 · context companion[/dim]")
+    console.print(f"[dark_orange3]{chain[:w - 2]}[/dark_orange3]\n")
+
     if not os.path.exists(PIPE_PATH):
         os.mkfifo(PIPE_PATH)
 

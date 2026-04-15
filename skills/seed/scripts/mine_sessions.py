@@ -128,7 +128,11 @@ def _call_sdk(conversation: str, system: str, model: str) -> str | None:
     async def _run():
         parts = []
         opts = ClaudeAgentOptions(
-            system_prompt=system, allowed_tools=[], max_turns=1, permission_mode="bypassPermissions"
+            system_prompt=system,
+            tools=[],
+            max_turns=1,
+            permission_mode="bypassPermissions",
+            extra_args={"setting-sources": ""},
         )
         opts.model = model
         async for msg in query(prompt=conversation, options=opts):

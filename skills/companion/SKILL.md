@@ -38,6 +38,49 @@ multiSelect: true
 
 ---
 
+## Step 1.5 — Check for unreconciled sessions
+
+```bash
+uv run python -c "
+import json
+from pathlib import Path
+p = Path('.companion/product.json')
+if not p.exists():
+    print('0')
+else:
+    ref = json.loads(p.read_text())
+    config = json.loads(Path(ref['config']).read_text())
+    spec_loc = Path(config['spec_location'])
+    cp_path = Path(ref['config']).parent / 'reconciled_sessions.json'
+    checkpoint = json.loads(cp_path.read_text()) if cp_path.exists() else {}
+    changes_dir = spec_loc / 'openspec' / 'changes'
+    unreconciled = []
+    if changes_dir.exists():
+        for d in changes_dir.iterdir():
+            if d.is_dir() and d.name not in checkpoint:
+                if (d / 'incremental.json').exists() or (d / 'extraction.json').exists():
+                    unreconciled.append(d.name)
+    print(len(unreconciled))
+"
+```
+
+If count > 0, use AskUserQuestion:
+```
+question: "Found N unreconciled sessions from previous runs. Reconcile now? (merges captured decisions into your canonical spec)"
+options: ["Yes, reconcile now", "Skip — I'll do it later"]
+```
+
+If yes, run reconcile:
+```bash
+uv run python ${CLAUDE_SKILL_DIR}/../seed/scripts/reconcile.py \
+  "$(uv run python -c "import json; print(json.loads(open('.companion/product.json').read())['config'])")" \
+  .companion/modules.json
+```
+
+If 0 or skip → continue to Step 2.
+
+---
+
 ## Step 2 — Load specs and save state
 
 **If "Nothing — start fresh" selected** → skip to Step 3.
