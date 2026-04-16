@@ -10,19 +10,36 @@
 </pre>
 </p>
 
-<h1 align="center">Anchor</h1>
+<h1 align="center">Anchor - The IDE for Intent</h1>
 <p align="center">
-A context companion plugin for <a href="https://claude.ai/code">Claude Code</a><br/>
 Persistent memory of decisions, specs, and architectural constraints across sessions.
+It captures what you're building and why - automatically, as you work - and makes that intent persistent across every agent, every session, every project.
+A plugin for <a href="https://claude.ai/code">Claude Code</a><br/>
 </p>
 
 ---
 
-## The Problem
+## The real challenge of building with AI agents
 
-AI coding agents start every session from zero. Planning decisions evaporate. Non-negotiables get violated in implementation. The code exists but the intent behind it lives nowhere the agent can read.
+Code is becoming cheap to generate - you can regenerate it anytime. What's becoming scarce and valuable is the spec (what you're building and why) and verification (proof that it works). Your job as a developer is no longer writing code. It's steering.
 
-**Anchor is the patient chart that every agent reads before touching a single file** — and that every planning session writes into before implementation begins.
+I work plan-first. Every project starts with planning sessions - brainstorming with Claude, making architecture decisions, locking in constraints. The spec emerges from the conversation, not from a PRD handed down from above.
+
+The problem is that nothing captures what happens in those sessions. Decisions scatter. Architecture drifts because a constraint from last week is invisible today. You build something and realize three sessions later it contradicts something already agreed on.
+
+**Here's the thing: agents drift. But so do you.** You forget what was decided two weeks ago. You re-propose an approach you already ruled out. The problem isn't just that the agent loses context - it's that the whole development loop loses coherence.
+
+Anchor has already saved me hours. It reminds me of decisions made in other sessions, catches drift, loads sessions with the right context. It gives me confidence to move fast because I know if I forget, Anchor will catch it.
+
+### What Anchor does
+
+1. **Captures specs as you build** - decisions, rules, tradeoffs, lineage - without you having to write them down
+2. **Validates decisions across sessions** - flags when a new session contradicts something already established
+3. **Verifies implementation** - because Anchor holds the spec, it naturally becomes the verification layer. Not "does this code look right" but "does this code do what we said it should do" (WIP)
+
+## Who is this for
+Anchor is for builders who are primarily building software using AI agents. If you're spending more time steering agents than writing code. Anchor is built for you.
+
 
 ## How It Works
 
