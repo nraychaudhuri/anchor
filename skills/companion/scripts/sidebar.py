@@ -112,6 +112,7 @@ class MiniSession:
     impact: list[dict] = field(default_factory=list)  # plan impact items
     plan_file: str | None = None
     active_module: str | None = None  # module of most recent file change
+    status: str = ""  # shown in chart: "analyzing plan...", etc.
     started_at: str = ""
 
 
@@ -185,6 +186,11 @@ def build_chart(mini: MiniSession, loaded_modules: list[str]) -> Panel:
             mod_label = f" [dim]\\[{mod_tag}][/dim]" if mod_tag else ""
             alert = " [yellow]⚠[/yellow]" if f.get("alert") else ""
             lines.append(f"  → {Path(f['path']).name}{mod_label}{alert}")
+
+    # Status line
+    if mini.status:
+        lines.append("")
+        lines.append(f"  [dim yellow]{mini.status}[/dim yellow]")
 
     content = "\n".join(lines) if lines else "[dim]waiting for file changes...[/dim]"
     return Panel(content, title="[bold]anchor[/bold]", border_style="dim", box=box.ROUNDED)
@@ -722,19 +728,20 @@ def render_planning(ts: str, new_captures: list[dict], new_conflicts: list[dict]
                         break  # show most recent lineage entry
             except Exception:
                 pass
+        conflicts.append(conflict)
+        cnum = len(conflicts)
         console.print(
             Panel(
                 f"[{color}]{conflict.get('explanation', '')}[/{color}]\n\n"
                 f"[dim]Existing rule:[/dim] {conflict.get('existing_rule', '')}\n"
                 f"[dim]Module:[/dim] {conflict.get('module', '')}"
                 f"{lineage_line}\n\n"
-                f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
-                title=f"[bold {color}]⚠️  CONFLICT[/bold {color}]",
+                f"[bold]\\[s{cnum}] snooze / \\[r{cnum}] record / \\[o{cnum}] override[/bold]",
+                title=f"[bold {color}]⚠️  CONFLICT #{cnum}[/bold {color}]",
                 border_style=color,
                 box=box.ROUNDED,
             )
         )
-        conflicts.append(conflict)
 
 
 def render_plan_impact(adds: list[dict], modifies: list[dict], confs: list[dict]):
@@ -779,20 +786,20 @@ def render_plan_impact(adds: list[dict], modifies: list[dict], confs: list[dict]
             for item in items:
                 severity = item.get("severity", "warning")
                 color = "red" if severity == "violation" else "yellow"
+                with lock:
+                    conflicts.append(item)
+                    cnum = len(conflicts)
                 console.print(
                     Panel(
                         f"[{color}]Plan says:[/{color}] {item.get('text', '')}\n"
                         f"[dim]Existing rule ({item.get('type', 'rule')}):[/dim] {item.get('existing_rule', '')}\n"
                         f"[dim]Evidence:[/dim] {item.get('evidence', '')}\n\n"
-                        f"[bold]Action: \\[s]nooze / \\[r]ecord / \\[o]verride[/bold]",
-                        title=f"[bold {color}]⚠️  CONFLICT[/bold {color}]",
+                        f"[bold]\\[s{cnum}] snooze / \\[r{cnum}] record / \\[o{cnum}] override[/bold]",
+                        title=f"[bold {color}]⚠️  CONFLICT #{cnum}[/bold {color}]",
                         border_style=color,
                         box=box.ROUNDED,
                     )
                 )
-                # Also add to global conflicts list so the input listener can act on it
-                with lock:
-                    conflicts.append(item)
 
     console.print()
 
@@ -1011,39 +1018,55 @@ def handle_session_end(event: dict):
 def conflict_input_listener():
     """
     Background thread that reads keyboard input for conflict actions.
-    s = snooze, r = record, o = override (prompts for reason)
+    Accepts: s, r, o (acts on latest) or s1, r2, o3 (acts on specific conflict #)
     """
+    import re
     cwd = os.getcwd()
     while True:
         try:
             key = input().strip().lower()
+            # Parse action + optional number: s, r, o, s1, r2, o3
+            match = re.match(r'^([sro])(\d*)$', key)
+            if not match:
+                continue
+            action_key = match.group(1)
+            num_str = match.group(2)
+
             with lock:
                 if not conflicts:
                     continue
-                latest = conflicts[-1]
+                if num_str:
+                    idx = int(num_str) - 1  # 1-based to 0-based
+                    if idx < 0 or idx >= len(conflicts):
+                        console.print(f"[dim]  no conflict #{num_str}[/dim]")
+                        continue
+                    target = conflicts[idx]
+                else:
+                    idx = len(conflicts) - 1
+                    target = conflicts[-1]
 
-            if key == "s":
-                handle_conflict_action(latest, "snooze", "", cwd)
-                console.print("[dim]  → snoozed[/dim]")
+            if action_key == "s":
+                handle_conflict_action(target, "snooze", "", cwd)
+                console.print(f"[dim]  → snoozed #{idx + 1}[/dim]")
                 with lock:
-                    conflicts.pop()
+                    conflicts.pop(idx)
 
-            elif key == "r":
+            elif action_key == "r":
                 console.print("[dim]  note (enter to skip):[/dim] ", end="")
                 try:
                     note = input().strip()
                 except EOFError:
                     note = ""
-                handle_conflict_action(latest, "record", note, cwd)
+                handle_conflict_action(target, "record", note, cwd)
                 with lock:
-                    conflicts.pop()
+                    conflicts.pop(idx)
 
-            elif key == "o":
+            elif action_key == "o":
                 console.print("[bold]Reason for override:[/bold] ", end="")
                 reason = input().strip()
-                handle_conflict_action(latest, "override", reason, cwd)
+                handle_conflict_action(target, "override", reason, cwd)
                 with lock:
-                    conflicts.pop()
+                    conflicts.pop(idx)
 
         except EOFError:
             break
@@ -1194,8 +1217,9 @@ def main():
                             if mini.plan_file and not mini.impact:
                                 plan_path = event.get("file_path", "")
                                 if ".claude/plans/" in plan_path:
-                                    def _analyze_plan(m=mini, l=live, p=plan_path, lm=loaded_modules):
+                                    def _analyze_plan(m=mini, p=plan_path, lm=loaded_modules):
                                         try:
+                                            m.status = "analyzing plan..."
                                             cwd = event.get("cwd", os.getcwd())
                                             content = Path(p).read_text()[:20000]
                                             specs = load_all_specs(cwd, lm) if lm else {}
@@ -1209,12 +1233,9 @@ def main():
                                             items = json.loads(raw) if raw else []
                                             if isinstance(items, list):
                                                 m.impact = items
-                                                if l:
-                                                    try:
-                                                        l.update(build_chart(m, lm))
-                                                    except Exception:
-                                                        pass
+                                            m.status = ""
                                         except Exception as e:
+                                            m.status = ""
                                             log_error(f"Plan analysis error: {e}")
                                     threading.Thread(target=_analyze_plan, daemon=True).start()
 

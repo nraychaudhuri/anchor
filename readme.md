@@ -35,7 +35,7 @@ Anchor has already saved me hours. It reminds me of decisions made in other sess
 
 1. **Captures specs as you build** - decisions, rules, tradeoffs, lineage - without you having to write them down
 2. **Validates decisions across sessions** - flags when a new session contradicts something already established
-3. **Verifies implementation** - because Anchor holds the spec, it naturally becomes the verification layer. Not "does this code look right" but "does this code do what we said it should do" (WIP)
+3. **Verifies implementation** - because Anchor holds the spec, it naturally becomes the verification layer. Not "does this code look right" but "does this code do what we said it should do"
 
 ## Who is this for
 Anchor is for builders who are primarily building software using AI agents. If you're spending more time steering agents than writing code. Anchor is built for you.
@@ -64,6 +64,8 @@ All of this runs in a **companion sidebar** — a separate terminal window that 
 /plugin install anchor@nraychaudhuri-anchor
 ```
 
+> **Note:** After installing, restart your Claude Code session. `/reload-plugins` loads hooks but skills require a restart to appear.
+
 For development:
 ```bash
 claude --plugin-dir /path/to/anchor
@@ -79,7 +81,7 @@ claude --plugin-dir /path/to/anchor
 /anchor:companion
 ```
 
-The first time the companion sidebar starts, it will generate an OAuth token using your existing Claude subscription (no extra cost).
+The first time the companion sidebar starts, it will run `claude setup-token` interactively in the companion terminal to generate an OAuth token. This uses your existing Claude subscription — no extra API costs. The token is saved to `~/.anchor/auth.json` and reused automatically.
 
 ## The Two Commands
 
@@ -200,7 +202,7 @@ All hooks are thin relays — no API calls, exit in milliseconds. The sidebar do
 | Hook | Trigger | Role | What it does |
 |---|---|---|---|
 | `stop.py` | After each agent response | Historian | Relay to sidebar for incremental extraction |
-| `exit_plan_mode.py` | Plan approved | Historian | Send plan content for impact analysis |
+| `exit_plan_mode.py` | Plan approved | — | Persist captures, relay plan content to sidebar |
 | `post_tool_use.py` | File written/edited | Pair Partner | File change to sidebar for module tracking |
 | `session_end.py` | Session closes | — | Signal sidebar to show summary and exit |
 
@@ -211,14 +213,16 @@ Planning conversation
     ↓
 Stop hook → sidebar → LLM extraction → captures displayed
     ↓
-persist_capture() → incremental.json (saved immediately per capture)
+persist_capture() → incremental.json (saved immediately, per capture)
     ↓
-Session ends → sidebar shows summary + exits
+Plan file written → sidebar detects it → impact analysis (adds/modifies/conflicts)
+    ↓
+Session ends → sidebar shows session summary + exits cleanly
     ↓
 Next /anchor:companion → detects unreconciled sessions → reconciles into spec.json
 ```
 
-No data loss at any point. If the session crashes, captures are already on disk.
+No data loss at any point. Captures are saved to disk immediately — if the session crashes, everything up to the last capture is preserved. Reconcile runs on the next companion startup, not at session end.
 
 ## Directory Structure
 
