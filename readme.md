@@ -280,7 +280,7 @@ anchor/
 - [Claude Code](https://claude.ai/code) CLI installed
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
-- macOS (sidebar uses Terminal.app; Linux support planned)
+- macOS or Linux (sidebar opens in a new terminal window; detects gnome-terminal, konsole, xfce4-terminal, mate-terminal, tilix, alacritty, kitty, wezterm, or xterm — falls back to background process if none found)
 
 ## License
 

@@ -51,6 +51,38 @@ EOF
     exit 0
 fi
 
+# Linux: try common terminal emulators
+if [ "$(uname)" = "Linux" ] && { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }; then
+    LAUNCHER="$SCRIPT_DIR/launch_sidebar.sh"
+    if command -v gnome-terminal &>/dev/null; then
+        gnome-terminal -- bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in gnome-terminal" && exit 0
+    fi
+    if command -v konsole &>/dev/null; then
+        konsole -e bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in konsole" && exit 0
+    fi
+    if command -v xfce4-terminal &>/dev/null; then
+        xfce4-terminal -e "bash \"$LAUNCHER\"" 2>/dev/null && echo "sidebar started in xfce4-terminal" && exit 0
+    fi
+    if command -v mate-terminal &>/dev/null; then
+        mate-terminal -e "bash \"$LAUNCHER\"" 2>/dev/null && echo "sidebar started in mate-terminal" && exit 0
+    fi
+    if command -v tilix &>/dev/null; then
+        tilix -e "bash \"$LAUNCHER\"" 2>/dev/null && echo "sidebar started in tilix" && exit 0
+    fi
+    if command -v alacritty &>/dev/null; then
+        alacritty -e bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in alacritty" && exit 0
+    fi
+    if command -v kitty &>/dev/null; then
+        kitty bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in kitty" && exit 0
+    fi
+    if command -v wezterm &>/dev/null; then
+        wezterm start -- bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in wezterm" && exit 0
+    fi
+    if command -v xterm &>/dev/null; then
+        xterm -e bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in xterm" && exit 0
+    fi
+fi
+
 # fallback: background process
 nohup uv run "$SIDEBAR" > "$LOGFILE" 2>&1 &
 echo $! > "$PIDFILE"
