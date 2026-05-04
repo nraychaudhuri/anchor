@@ -1,0 +1,81 @@
+{
+  "module": "seed-skill",
+  "summary": "The seed-skill is the one-time bootstrap entry point for the anchor companion system. It guides the developer through an interactive setup, discovers the project's module structure, mines all historical Claude Code session transcripts for architectural decisions and constraints, and produces a canonical OpenSpec \u2014 a per-module collection of spec.json files that becomes the persistent source of truth for all subsequent companion roles (Architect, Historian, Validator). It is a write-once initialiser: after seeding, the companion reads from the spec on every session start.",
+  "business_rules": [
+    "The skill must check for an existing .companion/product.json before starting and offer the developer a choice to re-seed, add sessions only, or cancel \u2014 never silently overwrite.",
+    "Product configuration (name, associated project hashes, spec location) must be persisted to ~/.companion/products/<slug>/config.json and a local pointer written to <cwd>/.companion/product.json.",
+    "Module discovery must identify 5\u201315 major modules, present them to the developer for confirmation, and allow corrections before proceeding to spec writing.",
+    "Each discovered module must receive its own spec.json at <spec_location>/openspec/specs/<module-name>/spec.json.",
+    "Session mining must be run directly in the main agent via blocking Bash calls \u2014 not through Task subagents \u2014 to prevent race conditions where subagents return before their background writes complete.",
+    "Mining must skip sessions shorter than 2 messages or 500 total characters as too short to yield meaningful content.",
+    "Mining must use a checkpoint file (mined_sessions.json) to record success/failure per session; already-successful sessions must never be re-processed on a retry run.",
+    "Mining must retry the extraction LLM (Haiku) up to 3 times with exponential backoff before falling back to Sonnet, with 2 Sonnet attempts before recording a permanent failure.",
+    "Reconciliation must assign each extracted item to exactly one module (or 'general' if none fit), then merge business_rules, non_negotiables, tradeoffs, and summary into the canonical spec via an LLM merge \u2014 not by simple concatenation.",
+    "Items that contradict existing spec content must be flagged as conflicts in conflicts_pending.json rather than silently overwriting the existing rule.",
+    "Lineage entries must be appended to spec.json one entry per contributing session and must never be modified after writing.",
+    "The skill must produce a final summary to the developer showing modules, session counts, and any pending conflicts, and must offer to walk through conflicts interactively if any exist.",
+    "The reconciler must also process incremental.json files written by the sidebar companion, converting live-session captures into the same extraction format used by the transcript miner."
+  ],
+  "non_negotiables": [
+    "Lineage entries in spec.json are append-only and must never be rewritten or deleted after creation.",
+    "Session mining must not run through Task subagents; it must block in the main agent to guarantee all writes complete before reconciliation begins.",
+    "The reconciler must never overwrite spec content with conflicting information without flagging the contradiction; contradictions go to conflicts_pending.json.",
+    "Spec content must remain at product/architecture level \u2014 no DynamoDB field names, function signatures, or implementation details may appear in spec.json fields.",
+    "The skill must not write to any hook scripts or protected files; it writes only to .companion/, <spec_location>/openspec/, and product config files under ~/.companion/."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Use claude-haiku-4-5 as the primary extraction model with Sonnet as fallback",
+      "reason": "Haiku is faster and cheaper for high-volume transcript mining across potentially dozens or hundreds of sessions",
+      "accepted_cost": "Haiku may produce lower-quality or empty extractions more often, requiring retry logic and occasional Sonnet escalation"
+    },
+    {
+      "decision": "Checkpoint each session individually to disk after mining",
+      "reason": "Long-running mining across many sessions must be resumable if interrupted; per-session checkpointing allows retry without reprocessing successes",
+      "accepted_cost": "Disk I/O on every session; checkpoint file can become large on repos with many sessions"
+    },
+    {
+      "decision": "Parallel Task subagents for module spec writing, sequential blocking Bash for session mining",
+      "reason": "Spec writing is independent per module and benefits from parallelism; mining must be sequential and blocking to avoid race conditions with the reconciler",
+      "accepted_cost": "Mining is slower than it could be if parallelised; the architecture trade is correctness over throughput"
+    },
+    {
+      "decision": "LLM-based module assignment and spec merging in the reconciler rather than deterministic rules",
+      "reason": "Extracted items are free-text and may not contain explicit module identifiers; an LLM can infer relevance from description and context",
+      "accepted_cost": "Reconciliation cost scales with number of extracted items; non-deterministic assignment may vary across runs"
+    },
+    {
+      "decision": "Store canonical specs under a user-chosen <spec_location> outside .companion/",
+      "reason": "Specs are intended for version control alongside the product; keeping them in a developer-chosen path makes git-tracking natural",
+      "accepted_cost": "Two separate config locations must be kept in sync (.companion/product.json pointer + ~/.companion/products/<slug>/config.json)"
+    }
+  ],
+  "conflicts": [],
+  "lineage": [
+    {
+      "session_id": "743632e3-5fb0-4fa8-87ce-56ab1da01280",
+      "summary": "",
+      "date": "2026-04-16",
+      "resume": "claude --resume 743632e3-5fb0-4fa8-87ce-56ab1da01280",
+      "what_changed": "Setting up the Seed skill to bootstrap Context Companion specification generation",
+      "key_decisions": [
+        "Context Companion system must use a canonical spec format defined in openspec_format.md",
+        "Each product maintains its own configuration file at .companion/product.json",
+        "Seed skill specifications must conform to the canonical spec.json format",
+        "Generate module specifications in parallel across independent agents",
+        "Module specifications are generated in parallel by independent agents"
+      ]
+    },
+    {
+      "session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "summary": "",
+      "date": "2026-04-19",
+      "resume": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "what_changed": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+      "key_decisions": [
+        "Seed operation must run once per project to bootstrap spec.json files; subsequent sessions load and monitor existing spe"
+      ]
+    }
+  ],
+  "last_updated": "2026-04-19"
+}

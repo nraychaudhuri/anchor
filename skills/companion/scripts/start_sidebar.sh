@@ -8,13 +8,10 @@ SIDEBAR="$SCRIPT_DIR/sidebar.py"
 PIDFILE="$PROJECT_DIR/.companion/sidebar.pid"
 LOGFILE="$PROJECT_DIR/.companion/sidebar.log"
 
-# check if already running by process name (works regardless of how it was started)
-if pgrep -f "sidebar.py" > /dev/null 2>&1; then
-    echo "sidebar already running"
-    exit 0
-fi
+# Compute 8-char hash of PROJECT_DIR for per-project pipe isolation
+HASH=$(echo "$PROJECT_DIR" | md5sum 2>/dev/null | cut -c1-8 || echo "$PROJECT_DIR" | md5 -q 2>/dev/null | cut -c1-8 || echo "default")
 
-# also check PID file as fallback
+# check PID file to see if sidebar is already running
 if [ -f "$PIDFILE" ]; then
     PID=$(cat "$PIDFILE")
     if kill -0 "$PID" 2>/dev/null; then
@@ -25,8 +22,8 @@ fi
 
 cd "$PROJECT_DIR"
 
-# write project dir for launch_sidebar.command (open doesn't propagate env vars)
-echo "$PROJECT_DIR" > /tmp/anchor_project_dir
+# write project dir for launch scripts (open doesn't propagate env vars)
+echo "$PROJECT_DIR" > "/tmp/anchor_project_dir_${HASH}"
 
 # macOS: open new Terminal window (no accessibility permissions needed)
 if command -v open &>/dev/null && [ "$(uname)" = "Darwin" ]; then
@@ -43,7 +40,7 @@ if command -v osascript &>/dev/null && osascript -e 'tell application "iTerm2" t
 tell application "iTerm2"
     create window with default profile
     tell current session of current window
-        write text "cd '$PROJECT_DIR' && uv run python '$SIDEBAR'"
+        write text "cd '$PROJECT_DIR' && uv run python '$SIDEBAR' --project-dir '$PROJECT_DIR'"
     end tell
 end tell
 EOF
@@ -54,6 +51,8 @@ fi
 # Linux: try common terminal emulators
 if [ "$(uname)" = "Linux" ] && { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }; then
     LAUNCHER="$SCRIPT_DIR/launch_sidebar.sh"
+    export ANCHOR_PROJECT_DIR="$PROJECT_DIR"
+    export ANCHOR_PROJECT_HASH="$HASH"
     if command -v gnome-terminal &>/dev/null; then
         gnome-terminal -- bash "$LAUNCHER" 2>/dev/null && echo "sidebar started in gnome-terminal" && exit 0
     fi
@@ -84,7 +83,7 @@ if [ "$(uname)" = "Linux" ] && { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ];
 fi
 
 # fallback: background process
-nohup uv run "$SIDEBAR" > "$LOGFILE" 2>&1 &
+nohup uv run "$SIDEBAR" --project-dir "$PROJECT_DIR" > "$LOGFILE" 2>&1 &
 echo $! > "$PIDFILE"
 echo "sidebar started in background (pid $!)"
 echo "run: tail -f .companion/sidebar.log"

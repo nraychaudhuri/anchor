@@ -54,6 +54,15 @@ if [ -n "$TOKEN" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cat /tmp/anchor_project_dir 2>/dev/null || pwd)"
+
+# Resolve project dir: use env var if set by start_sidebar.sh, otherwise read from hashed tmp file
+if [ -n "$ANCHOR_PROJECT_DIR" ]; then
+    PROJECT_DIR="$ANCHOR_PROJECT_DIR"
+elif [ -n "$ANCHOR_PROJECT_HASH" ]; then
+    PROJECT_DIR="$(cat "/tmp/anchor_project_dir_${ANCHOR_PROJECT_HASH}" 2>/dev/null || pwd)"
+else
+    PROJECT_DIR="$(cat /tmp/anchor_project_dir 2>/dev/null || pwd)"
+fi
+
 cd "$PROJECT_DIR"
-uv run "$SCRIPT_DIR/sidebar.py"
+uv run "$SCRIPT_DIR/sidebar.py" --project-dir "$PROJECT_DIR"

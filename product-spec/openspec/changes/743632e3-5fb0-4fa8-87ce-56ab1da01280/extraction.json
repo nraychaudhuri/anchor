@@ -1,0 +1,61 @@
+{
+  "has_planning_content": true,
+  "module_hints": [
+    "seed",
+    "Context Companion"
+  ],
+  "business_rules": [
+    {
+      "text": "Context Companion system must use a canonical spec format defined in openspec_format.md",
+      "evidence": "Read `references/openspec_format.md` now \u2014 it defines the spec.json format this skill produces",
+      "confidence": "high"
+    },
+    {
+      "text": "Each product maintains its own configuration file at .companion/product.json",
+      "evidence": "Check first: Run `cat .companion/product.json 2>/dev/null`. If it exists, use AskUserQuestion",
+      "confidence": "high"
+    }
+  ],
+  "non_negotiables": [
+    {
+      "text": "Seed skill specifications must conform to the canonical spec.json format",
+      "evidence": "it defines the spec.json format this skill produces",
+      "confidence": "high"
+    }
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Generate module specifications in parallel across independent agents",
+      "reason": "Enables faster specification generation for multiple modules simultaneously",
+      "accepted_cost": "Coordination complexity and blocking wait time for all agents to complete",
+      "evidence": "Writing specs for 15 modules in parallel... 5 of 15 specs received. Waiting for the remaining 10 agents"
+    }
+  ],
+  "ruled_out": [],
+  "decisions": [
+    {
+      "text": "Module specifications are generated in parallel by independent agents",
+      "evidence": "Writing specs for 15 modules in parallel... 5 of 15 specs received. Waiting for the remaining 10 agents",
+      "agreement_type": "implicit",
+      "confidence": "medium"
+    },
+    {
+      "text": "Use AskUserQuestion for interactive setup when product configuration already exists",
+      "evidence": "If it exists, use AskUserQuestion",
+      "agreement_type": "implicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Product name is derived from working directory path",
+      "evidence": "the working directory is `/mnt/work/cora` and the project is \"cora\", so I'll use that as PRODUCT_NAME",
+      "agreement_type": "implicit",
+      "confidence": "medium"
+    }
+  ],
+  "session_purpose": "Setting up the Seed skill to bootstrap Context Companion specification generation",
+  "_session_id": "743632e3-5fb0-4fa8-87ce-56ab1da01280",
+  "_session_summary": "",
+  "_session_date": "2026-04-16",
+  "_project_path": "/mnt/work-anchor",
+  "_resume_cmd": "claude --resume 743632e3-5fb0-4fa8-87ce-56ab1da01280"
+}

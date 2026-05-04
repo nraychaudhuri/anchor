@@ -1,0 +1,14 @@
+# .pairmode-overrides — Sections intentionally diverged from canonical pairmode templates.
+#
+# Audit and sync will treat declared sections as project-owned (EXTRA) rather than
+# INCONSISTENT or MISSING. Sync will never overwrite a declared override section.
+#
+# Format: one entry per line — <relative-file-path>:<normalised-section-key>
+# Lines starting with # are comments. Blank lines are ignored.
+#
+# The section key is the lowercased, stripped header text.
+# Examples:
+#   CLAUDE.md:review checklist
+#   .claude/agents/reviewer.md:checklist
+#
+# Add entries below this line:

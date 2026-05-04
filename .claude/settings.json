@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); echo \"$INPUT\" | jq -re '.tool_input.file_path // \"\"' | grep -q '\\.py$' && cd /mnt/work/anchor && PATH=$HOME/.local/bin:$PATH uv run pytest tests/pairmode/ -x -q 2>&1 | tail -20 || true",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "defaultMode": "auto",
+    "deny": [
+      "Edit(skills/companion/**)",
+      "Write(skills/companion/**)",
+      "Edit(hooks/**)",
+      "Write(hooks/**)",
+      "Edit(lessons/**)",
+      "Write(lessons/**)",
+      "Edit(.claude-plugin/**)",
+      "Write(.claude-plugin/**)",
+      "Edit(skills/seed/**)",
+      "Write(skills/seed/**)"
+    ]
+  }
+}

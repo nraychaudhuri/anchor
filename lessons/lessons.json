@@ -1,0 +1,152 @@
+{
+  "version": "1.0.0",
+  "lessons": [
+    {
+      "id": "L001",
+      "date": "2026-04-20",
+      "source_project": "anchor",
+      "trigger": "Ran audit against cora \u2014 a project with pairmode scaffold but no pairmode_context.json",
+      "problem": "44 INCONSISTENT findings for every section body because fallback context renders all template variables as empty strings. The output is confusing \u2014 it looks like everything needs repair, when really the project just needs to be bootstrapped with pairmode to generate the context file.",
+      "learning": "When audit detects no pairmode_context.json, it should emit a prominent warning: 'No pairmode_context.json found \u2014 template body comparison will show false INCONSISTENT for all variable-bearing sections. Bootstrap this project with /anchor:pairmode to fix.' MISSING and EXTRA findings remain reliable; INCONSISTENT findings require a context file to be meaningful.",
+      "methodology_change": {
+        "affects": [
+          "audit.py"
+        ],
+        "description": "Add a warning in audit output when pairmode_context.json is missing. Ideally suppress INCONSISTENT findings entirely when no context file exists, or clearly label them as 'body comparison unreliable \u2014 no context file'."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L002",
+      "date": "2026-04-20",
+      "source_project": "anchor",
+      "trigger": "Ran audit against radar and forqsite \u2014 projects with pairmode scaffold",
+      "problem": "INCONSISTENT findings include entries with section keys like '---' and '---__0'. These are separator lines (_split_sections treats '---' as a section delimiter and the text after it as the section body). Users see 'Section --- content differs from canonical template' and cannot tell what content is being compared or where to look in the file.",
+      "learning": "The _split_sections output uses '---' as section keys in audit output. These entries are hard to interpret. Either: (a) skip separator-keyed sections from INCONSISTENT comparison since --- separators carry no semantic content, or (b) display the surrounding context (what section comes before/after) when reporting --- inconsistencies.",
+      "methodology_change": {
+        "affects": [
+          "audit.py"
+        ],
+        "description": "In audit.py _split_sections or the INCONSISTENT loop, skip or relabel entries whose section key starts with '---' to reduce noise in audit output."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L003",
+      "date": "2026-04-21",
+      "source_project": "anchor",
+      "trigger": "Bootstrap dogfood on anchor \u2014 re-running after bug fixes",
+      "problem": "Bootstrap overwrote hand-authored .claude/agents/ files with template output that was strictly worse: truncated checklist names, empty layer-rule sections, build_command interpolated into prose.",
+      "learning": "For mature projects, templates are a starting point, not a replacement. Files that already exist should be skipped by default (same as CLAUDE.md/CLAUDE.build.md), or bootstrap should warn before overwriting hand-authored content.",
+      "methodology_change": {
+        "affects": [
+          "orchestrator"
+        ],
+        "description": "Bootstrap should skip existing agent files by default. Add a --force-agents flag for intentional overwrites. Document in SKILL.md that agent files are treated as project-owned after first bootstrap."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L004",
+      "date": "2026-04-21",
+      "source_project": "anchor",
+      "trigger": "Bootstrap dogfood \u2014 builder.md Python standards section",
+      "problem": "builder.md template uses {{ build_command }} inside the 'All Python execution uses ...' prose, producing 'All Python execution uses PATH=$HOME/.local/bin:$PATH uv run pytest tests/pairmode/'. The build command is not the Python runtime.",
+      "learning": "Template variables should be scoped to their semantic slot. build_command belongs in the build-gate section only; the Python standards section should hardcode 'uv run'.",
+      "methodology_change": {
+        "affects": [
+          "builder_agent"
+        ],
+        "description": "Fix builder.md.j2: replace '{{ build_command }}' in the Python standards prose with the literal string 'uv run'. Use build_command only in the build-gate verification block."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L005",
+      "date": "2026-04-21",
+      "source_project": "anchor",
+      "trigger": "Bootstrap dogfood \u2014 reviewer.md checklist from spec non-negotiables",
+      "problem": "checklist_deriver produces items whose 'name' field is the first N chars of the non-negotiable text, truncated mid-sentence. reviewer.md became a 595-line wall of truncated constraint prose instead of a human-readable checklist.",
+      "learning": "Non-negotiables are constraints, not checklist item names. The reviewer checklist needs human-authored label + short action question, not raw spec text. checklist_deriver should either produce module-scoped labels (e.g. 'companion-skill: spec write isolation') or not populate the reviewer checklist at all \u2014 leaving that to the human.",
+      "methodology_change": {
+        "affects": [
+          "reviewer_checklist"
+        ],
+        "description": "Remove spec-derived checklist_items from the reviewer.md template, or change the template to use module+ordinal labels. The reviewer checklist should be maintained by the developer, seeded with universal items only."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L006",
+      "date": "2026-04-21",
+      "source_project": "anchor",
+      "trigger": "Dogfood audit run on anchor after clean bootstrap",
+      "problem": "Audit reports INCONSISTENT for every hand-authored section that is richer than the template. It cannot distinguish 'unintentional drift' from 'intentional override with better content'. Result: a mature project sees constant audit noise it can never resolve without degrading its docs.",
+      "learning": "Audit needs a way to mark sections as intentionally overridden. Without that signal, any project that customises its scaffold will permanently live in a noisy INCONSISTENT state, eroding trust in the tool.",
+      "methodology_change": {
+        "affects": [
+          "orchestrator"
+        ],
+        "description": "Add a per-section override marker (e.g. a comment tag like '{# PROJECT_OVERRIDE #}') that audit treats as EXTRA rather than INCONSISTENT. Alternatively, add a .pairmode-overrides file listing section keys the project owns. Either approach lets audit surface real drift without nagging about deliberate customisation."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "captured"
+    },
+    {
+      "id": "L007",
+      "date": "2026-04-21",
+      "source_project": "anchor",
+      "trigger": "Dogfood pairmode on multiple projects simultaneously \u2014 anchor + ud running at same time",
+      "problem": "All hook scripts wrote to /tmp/companion.pipe, and pgrep -f sidebar.py checked for any sidebar process. With two projects running, all events from both projects merged into one sidebar window. The wrong project's spec was shown for every event.",
+      "learning": "The pipe path must be scoped to the project directory. Each project gets its own pipe derived from an 8-char md5 hash of the project dir. The sidebar reads its own pipe only. Hooks read the pipe_path from .companion/state.json at startup.",
+      "methodology_change": {
+        "affects": [
+          "hooks",
+          "sidebar",
+          "bootstrap"
+        ],
+        "description": "Per-project pipe isolation: compute PIPE_PATH = /tmp/companion-<md5hash>.pipe from project dir. Hooks read pipe_path from .companion/state.json (with /tmp/companion.pipe fallback). Sidebar writes pipe_path to state.json at startup. start_sidebar.sh passes --project-dir and uses per-project /tmp/anchor_project_dir_<hash> temp file."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "applied"
+    },
+    {
+      "id": "L008",
+      "date": "2026-04-24",
+      "source_project": "radar",
+      "trigger": "Phase 21 spec written, CER agent run on spec before build, found 20 issues including compile-blockers",
+      "problem": "Spec had multiple errors that would have caused the builder to produce uncompilable code or silently wrong behaviour: wrong call site argument in updateTask (data vs existing), missing explicit createRail body pass-through, reorderRail cross-context corruption, missing ApiRail type update in adapters.ts, stale contextRailsById race condition.",
+      "learning": "Running a cold-eyes review on the phase spec itself (not just on built code) catches architectural and correctness errors before any builder time is spent. The CER agent reading actual source files alongside the spec finds mismatches the spec author missed. This is more valuable than a post-build reviewer alone.",
+      "methodology_change": {
+        "affects": [
+          "orchestrator",
+          "reviewer_checklist"
+        ],
+        "description": "Add a spec-CER step to the build orchestrator sequence: after writing a phase spec and before saying Build Phase N, spawn a security-auditor (or general-purpose) agent to cold-eyes review the spec against the actual codebase, then incorporate findings before building. Document this as a standard checkpoint in CLAUDE.build.md."
+      },
+      "applies_to": [
+        "all"
+      ],
+      "status": "captured"
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "has_planning_content": true,
+  "module_hints": [
+    "launch_sidebar.sh",
+    "start_sidebar.sh",
+    "launch_sidebar.command",
+    "stop.py",
+    "post_tool_use.py",
+    "sidebar.py",
+    "SKILL.md",
+    "spec.json",
+    "README"
+  ],
+  "business_rules": [
+    {
+      "text": "Hooks (stop.py, post_tool_use.py) and sidebar.py are already POSIX-compatible; /tmp directory usage requires no platform-specific changes",
+      "evidence": "The rest of the codebase (hooks, sidebar.py) is already POSIX-compatible \u2014 `/tmp` works fine on Linux so no need to touch those.",
+      "confidence": "high"
+    },
+    {
+      "text": "Terminal launcher must detect platform and use appropriate terminal emulator; must include fallback for unknown systems",
+      "evidence": "Create `launch_sidebar.sh` (Linux equivalent of `launch_sidebar.command`)... Update `start_sidebar.sh` to add Linux terminal detection between the macOS blocks and the fallback",
+      "confidence": "high"
+    },
+    {
+      "text": "Plugin loads stateless at session startup via --plugin-dir flag, registering skills and hooks available to all subsequent interactions",
+      "evidence": "claude --plugin-dir /mnt/work/anchor registers skills like /anchor:seed and /anchor:companion; The plugin is stateless at startup",
+      "confidence": "high"
+    },
+    {
+      "text": "Seed operation must run once per project to bootstrap spec.json files; subsequent sessions load and monitor existing specs",
+      "evidence": "Seed it once... it'll ask you a few setup questions... then spin up parallel agents... Each session after that, just run /anchor:companion... That loads the relevant specs into context",
+      "confidence": "high"
+    }
+  ],
+  "non_negotiables": [],
+  "tradeoffs": [
+    {
+      "decision": "Manual skill execution via SKILL.md reading instead of automatic plugin-driven execution in current session",
+      "reason": "Plugin was not pre-loaded in current session; manual execution achieves identical functional result",
+      "accepted_cost": "Requires explicit instruction-following; loses automatic context integration and plugin hooks",
+      "evidence": "The plugin isn't loaded in this session, but I can read the SKILL.md and run it manually \u2014 same effect."
+    },
+    {
+      "decision": "Platform-specific terminal detection logic with fallback case in start_sidebar.sh",
+      "reason": "Different terminal emulators available on different OSes (Terminal.app on macOS, gnome-terminal on Linux, etc.)",
+      "accepted_cost": "Increases code complexity and ongoing maintenance burden across platforms",
+      "evidence": "Create `launch_sidebar.sh` (Linux equivalent of `launch_sidebar.command`)... Update `start_sidebar.sh` to add Linux terminal detection between the macOS blocks and the fallback"
+    }
+  ],
+  "ruled_out": [],
+  "decisions": [
+    {
+      "text": "Create Linux support for Anchor plugin and contribute changes back via PR to original public repository",
+      "evidence": "Let's see if we can get it working in Linux, and if we do, I'll PR his repo and give it to him.",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Create launch_sidebar.sh as Linux equivalent of macOS launch_sidebar.command file",
+      "evidence": "Create `launch_sidebar.sh` (Linux equivalent of `launch_sidebar.command`)",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Add Linux terminal detection to start_sidebar.sh before fallback case",
+      "evidence": "Update `start_sidebar.sh` to add Linux terminal detection between the macOS blocks and the fallback",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Update README to document Linux support",
+      "evidence": "Now update the README to reflect Linux support",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Install uv as prerequisite for sidebar functionality",
+      "evidence": "`uv` isn't installed. That's a prerequisite... Want me to install it? USER: yes, please do",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Use gnome-terminal for Linux sidebar launching",
+      "evidence": "`gnome-terminal` is available and `$DISPLAY=:0` \u2014 we can test it.",
+      "agreement_type": "implicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Push changes to private fork and open PR against original public repository",
+      "evidence": "commit our changes, push to your fork, then open the PR targeting his repo",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Install GitHub CLI (gh) for command-line PR operations",
+      "evidence": "lets install it, I'll probably need it again... gh auth login to authenticate with SSH/GPG setup",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    },
+    {
+      "text": "Plugin flag can be combined with session resume flag: claude -c --plugin-dir",
+      "evidence": "You can combine the flags: cd /mnt/work/cora && claude -c --plugin-dir /mnt/work/anchor... That resumes your last cora session with Anchor loaded.",
+      "agreement_type": "explicit",
+      "confidence": "high"
+    }
+  ],
+  "session_purpose": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+  "_session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+  "_session_summary": "",
+  "_session_date": "2026-04-19",
+  "_project_path": "/mnt/work-anchor",
+  "_resume_cmd": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8"
+}

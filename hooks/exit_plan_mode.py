@@ -9,8 +9,14 @@ import os
 import sys
 import tempfile
 
-PIPE_PATH = os.path.join(tempfile.gettempdir(), "companion.pipe")
-STATE_PATH = ".companion/state.json"
+PIPE_PATH = os.path.join(tempfile.gettempdir(), "companion.pipe")  # legacy fallback
+try:
+    import json as _json
+    _state = _json.loads(open(".companion/state.json").read())
+    if _state.get("pipe_path"):
+        PIPE_PATH = _state["pipe_path"]
+except Exception:
+    pass
 
 
 def main():
@@ -19,28 +25,18 @@ def main():
     except Exception:
         return
 
-    # flip mode to implementation
-    try:
-        with open(STATE_PATH) as f:
-            state = json.load(f)
-        state["mode"] = "implementation"
-        with open(STATE_PATH, "w") as f:
-            json.dump(state, f, indent=2)
-    except Exception:  # nosec B110
-        pass
-
     # grab plan content from tool_input + loaded modules from state
     tool_input = data.get("tool_input", {}) or {}
     plan = (tool_input.get("plan", "") or "")[:20000]
 
     loaded_modules = []
     try:
-        with open(STATE_PATH) as f:
+        with open(".companion/state.json") as f:
             loaded_modules = json.load(f).get("last_loaded_modules", [])
     except Exception:  # nosec B110
         pass
 
-    # signal companion: do the deep extraction pass now
+    # signal companion: do the deep extraction pass now + flip mode to implementation
     if os.path.exists(PIPE_PATH):
         try:
             fd = os.open(PIPE_PATH, os.O_WRONLY | os.O_NONBLOCK)
@@ -58,6 +54,8 @@ def main():
                 + "\n"
             )
             os.write(fd, event.encode())
+            mode_event = json.dumps({"event": "mode_change", "mode": "implementation"}) + "\n"
+            os.write(fd, mode_event.encode())
             os.close(fd)
         except (OSError, BlockingIOError):
             pass

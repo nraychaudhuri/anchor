@@ -1,0 +1,56 @@
+{
+  "module": "hooks",
+  "summary": "The hooks module is the event boundary between the Claude Code runtime and the anchor companion sidebar. It intercepts four lifecycle events \u2014 plan approval, file writes, turn completion, and session end \u2014 and relays structured event payloads to a named pipe consumed by the sidebar process. Hooks are intentionally thin: they perform no analysis, make no API calls, and write no spec or memory files. All intelligence is delegated to the sidebar. The module is fully POSIX-compatible with no platform-specific requirements.",
+  "business_rules": [
+    "Every hook must read its input from stdin as JSON and silently succeed (exit 0) if the input is malformed or missing.",
+    "A hook must check that the named pipe exists before attempting to write; if the pipe is absent the hook must exit silently without error.",
+    "All inter-process communication from hooks must go exclusively through the named pipe at /tmp/companion.pipe.",
+    "Pipe writes must be non-blocking: if the pipe is full or unread the hook must discard the write and exit rather than blocking the Claude Code process.",
+    "The exit_plan_mode hook must transition the session state from planning to implementation mode when a plan is approved, so downstream consumers can distinguish planning-phase events from implementation-phase events.",
+    "The session_end hook must write a closed-session marker to the project state file, recording the session ID, timestamp, and a clean-close flag, so a subsequent session can detect whether the previous session was force-killed.",
+    "The session_end hook must reset the session mode to planning in the project state file so each new session starts in a clean state.",
+    "The session_end hook runs asynchronously (non-blocking to Claude Code session exit) and is the only hook permitted a timeout greater than 5 seconds.",
+    "The post_tool_use hook must fire only on file-writing tool events (Write, Edit, MultiEdit) and silently ignore all other tool events.",
+    "Each event payload relayed to the pipe must include the session ID, working directory, and the list of currently loaded spec modules so the sidebar can perform context-aware processing without re-reading state itself.",
+    "All hooks and the sidebar are POSIX-compatible; use of /tmp for the named pipe requires no platform-specific handling or adaptation."
+  ],
+  "non_negotiables": [
+    "Hooks must never make API calls of any kind.",
+    "Hooks must never spawn subprocesses or perform any operation that could block for more than a few milliseconds.",
+    "Hooks must never write directly to spec files, openspec files, or any file under the .companion/ directory \u2014 with the sole exception that session_end writes the closed-session marker to state.json.",
+    "Hooks must never perform extraction, conflict detection, UML generation, or any other analytical logic; those responsibilities belong exclusively to the sidebar.",
+    "Hooks must never suppress or auto-approve a Claude Code permission prompt (e.g. ExitPlanMode); the decision must always be passed back to the normal Claude Code approval UI.",
+    "The hooks.json registration file must not be modified without an explicit architectural reason, as it is a protected file governing which lifecycle events anchor intercepts."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Non-blocking pipe writes that silently drop events if the sidebar is busy",
+      "reason": "Hook latency affecting the Claude Code turn cycle is a worse outcome than occasional missed events",
+      "accepted_cost": "Events can be silently lost if the sidebar pipe buffer is full"
+    },
+    {
+      "decision": "State reads inside hooks use best-effort exception swallowing rather than validated I/O",
+      "reason": "Keeps hooks fast and simple",
+      "accepted_cost": "Silent degradation if state.json is corrupt or missing"
+    },
+    {
+      "decision": "session_end writes directly to state.json rather than relaying through the pipe",
+      "reason": "The sidebar may not be running at session end and the closed-session marker must be written regardless",
+      "accepted_cost": "Minor asymmetry in the architecture \u2014 one hook writes a .companion/ file directly"
+    }
+  ],
+  "conflicts": [],
+  "lineage": [
+    {
+      "session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "summary": "",
+      "date": "2026-04-19",
+      "resume": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "what_changed": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+      "key_decisions": [
+        "Hooks (stop.py, post_tool_use.py) and sidebar.py are already POSIX-compatible; /tmp directory usage requires no platform"
+      ]
+    }
+  ],
+  "last_updated": "2026-04-19"
+}

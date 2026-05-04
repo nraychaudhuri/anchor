@@ -1,0 +1,77 @@
+# {{ project_name }} — Architecture
+
+## What {{ project_name }} is
+
+{{ project_description }}
+
+This document is the source of truth for the {{ project_name }} codebase. Read it before any task.
+
+---
+
+## Stack
+
+{{ stack }}
+
+---
+
+## Domain model
+
+{{ domain_model }}
+
+---
+
+## Module structure
+
+```
+{{ project_name }}/
+{% for module in module_structure %}
+  {{ module.name }}/                    ← {{ module.description }}
+{% for path in module.paths %}
+    {{ path }}
+{% endfor %}
+{% endfor %}
+```
+
+---
+
+## Layer rules
+
+| Layer | May import from | May not import from |
+|-------|----------------|---------------------|
+{% for rule in layer_rules %}
+| {{ rule.layer }} | {{ rule.may_import }} | {{ rule.may_not_import }} |
+{% endfor %}
+
+---
+
+## Build commands
+
+```bash
+# Build / test
+{{ build_command }}
+
+# Run all tests
+{{ test_command }}
+```
+
+---
+
+## Protected files
+
+These files are working and must not be modified without a stated reason:
+
+{% for path in protected_paths %}
+- `{{ path }}`
+{% endfor %}
+
+---
+
+## Non-negotiables
+
+{% if non_negotiables %}
+{% for item in non_negotiables %}
+- {{ item }}
+{% endfor %}
+{% else %}
+_(No non-negotiables defined yet — add them here as the project matures.)_
+{% endif %}

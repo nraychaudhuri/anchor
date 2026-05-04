@@ -1,0 +1,123 @@
+# Reconstruction Brief — {{ project_name }}
+
+> This document is the sole input for an independent reconstruction agent.
+> The agent must not have access to the original source code.
+> It should produce an implementation that satisfies the ideology and constraints
+> recorded here — free to diverge in all other respects.
+
+---
+
+## What you are building
+
+{{ reconstruction_what if reconstruction_what else "_(derive from docs/brief.md — What this project produces)_" }}
+
+## Why it exists
+
+{{ reconstruction_why if reconstruction_why else "_(derive from docs/brief.md — Why it exists)_" }}
+
+---
+
+## Non-negotiable ideology
+
+> These convictions and constraints must be expressed in any correct implementation.
+> An implementation that contradicts them is not this project.
+
+### Convictions
+
+{% if convictions %}
+{% for conviction in convictions %}
+- {{ conviction }}
+{% endfor %}
+{% else %}
+_(no convictions recorded — populate docs/ideology.md first)_
+{% endif %}
+
+### Constraints
+
+{% if constraints %}
+{% for constraint in constraints %}
+#### {{ constraint.name }}
+
+**Rule:** {{ constraint.rule }}
+
+**Why this constraint exists:** {{ constraint.rationale }}
+
+{% endfor %}
+{% else %}
+_(no constraints recorded — populate docs/ideology.md first)_
+{% endif %}
+
+---
+
+## What must survive any implementation
+
+{% if must_preserve %}
+{% for item in must_preserve %}
+- {{ item }}
+{% endfor %}
+{% else %}
+_(not yet specified — populate docs/ideology.md Reconstruction guidance)_
+{% endif %}
+
+---
+
+## What you are free to change
+
+> These are fingerprints of the original implementation, not constraints.
+> You are encouraged to find better approaches.
+
+{% if free_to_change %}
+{% for item in free_to_change %}
+- {{ item }}
+{% endfor %}
+{% else %}
+_(not yet specified — populate docs/ideology.md Free to change)_
+{% endif %}
+
+---
+
+## Comparison rubric
+
+> After building, your implementation will be evaluated against the original on
+> these dimensions. Optimise for them explicitly.
+
+{% if comparison_dimensions %}
+{% for dim in comparison_dimensions %}
+- **{{ dim.name }}:** {{ dim.description }}
+{% endfor %}
+{% else %}
+_(not yet specified — populate docs/ideology.md Comparison basis)_
+{% endif %}
+
+---
+
+## What you should question
+
+> The original implementation made these choices under time or knowledge constraints.
+> You are encouraged to find better solutions and justify them against the convictions above.
+
+{% if should_question %}
+{% for item in should_question %}
+- {{ item }}
+{% endfor %}
+{% else %}
+_(not yet specified — populate docs/ideology.md Should question)_
+{% endif %}
+
+---
+
+## Instructions for the reconstruction agent
+
+1. Read this document in full before writing any code.
+2. Build a working implementation that satisfies the ideology above.
+3. For every non-negotiable constraint: explicitly state how your implementation satisfies it.
+4. For every "should question" item: either improve on it or justify why you kept the
+   original approach, citing the relevant conviction.
+5. For every comparison dimension: document your approach and how it scores against the rubric.
+6. Do not look at the original source code. If you have seen it, declare that before starting.
+7. When done, produce a `RECONSTRUCTION.md` at your project root scoring your implementation
+   against each comparison dimension.
+
+*Generated from `docs/ideology.md` and `docs/brief.md` by `/anchor:pairmode reconstruct`.*
+*Original project: {{ project_name }}*
+*Generated: {{ generated_date | default("_(date not set)_") }}*

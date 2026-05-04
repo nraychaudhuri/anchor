@@ -1,0 +1,50 @@
+{
+  "module": "plugin-manifest",
+  "summary": "The plugin-manifest module comprises two JSON files that register anchor with the Claude Code plugin system and the Claude marketplace. plugin.json declares the plugin's identity (name, description, version, author) to the local Claude Code runtime, enabling it to load the plugin's hooks and skills stateless at session startup via the --plugin-dir flag. marketplace.json registers the plugin as a publishable package under a named owner/repo, providing the metadata Claude Code's marketplace infrastructure needs to discover, index, and install the plugin from GitHub. Together these two files are the outer contract between anchor and the Claude Code platform \u2014 without them, none of anchor's hooks or skills can be loaded by any Claude Code session.",
+  "business_rules": [
+    "plugin.json must declare a plugin name, human-readable description, semantic version, and author identity so the Claude Code runtime can identify and load the plugin.",
+    "marketplace.json must reference the canonical GitHub repo (nraychaudhuri/anchor) as the install source so the marketplace can resolve and distribute the plugin.",
+    "The version field in plugin.json and the version field inside marketplace.json's plugins array must stay in sync so the runtime and the marketplace agree on the current release.",
+    "The plugin name in plugin.json must match the name field inside the plugins array of marketplace.json to maintain a consistent identity across local and remote contexts.",
+    "Both files must remain valid JSON at all times; malformed manifests will prevent plugin load.",
+    "The plugin loads stateless at session startup via the --plugin-dir flag, registering all declared skills and hooks as available to all subsequent interactions in that session.",
+    "The --plugin-dir flag can be combined with the session resume flag, e.g. claude -c --plugin-dir, allowing anchor's skills and hooks to be available when resuming an existing session."
+  ],
+  "non_negotiables": [
+    "Neither file may be modified without a stated reason \u2014 they are declared protected files in the architecture and any change is a protected-file event requiring explicit justification.",
+    "The source.source field in marketplace.json must remain 'github' and source.repo must remain 'nraychaudhuri/anchor'; changing these breaks marketplace discoverability and install resolution.",
+    "These files must never be generated, overwritten, or written to by hooks, sidebar.py, or any runtime skill script \u2014 they are static declarations, not runtime artifacts."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Split identity into two files (plugin.json for runtime, marketplace.json for distribution) rather than a single manifest",
+      "reason": "The Claude Code plugin system separates local runtime registration from marketplace publishing concerns; following that contract keeps anchor compatible with the platform's own tooling and future marketplace features.",
+      "accepted_cost": "Version and name must be kept in sync across two files manually; there is no single source of truth for version within the repo."
+    },
+    {
+      "decision": "Pin source to GitHub (source.source = 'github') rather than a registry or package manager",
+      "reason": "The Claude Code marketplace currently resolves plugins directly from GitHub repos, so a GitHub source reference is the only supported distribution mechanism.",
+      "accepted_cost": "Publishing a release requires a tagged GitHub commit; there is no npm/PyPI-style versioned artifact store."
+    },
+    {
+      "decision": "Declare the files as protected (no automated mutation allowed)",
+      "reason": "Manifest files are the platform contract boundary. Automated writes risk breaking plugin load for all users of the installed plugin.",
+      "accepted_cost": "Version bumps and description updates require a deliberate manual edit and stated justification, adding friction to routine releases."
+    }
+  ],
+  "conflicts": [],
+  "lineage": [
+    {
+      "session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "summary": "",
+      "date": "2026-04-19",
+      "resume": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "what_changed": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+      "key_decisions": [
+        "Plugin loads stateless at session startup via --plugin-dir flag, registering skills and hooks available to all subsequen",
+        "Plugin flag can be combined with session resume flag: claude -c --plugin-dir"
+      ]
+    }
+  ],
+  "last_updated": "2026-04-19"
+}

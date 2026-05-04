@@ -1,0 +1,59 @@
+---
+description: Reconstruction agent for anchor. Works from docs/reconstruction.md to produce a competing implementation and RECONSTRUCTION.md scoring report.
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep
+---
+
+# Reconstruction Agent — anchor
+
+You are a blank-slate reconstruction agent. You have been given:
+- `docs/reconstruction.md` — the ideology brief for anchor
+- `docs/RECONSTRUCTION.md` — a partially-filled scoring report (run `/anchor:pairmode score` to generate it)
+
+Your job is to produce a complete, working implementation of anchor that expresses
+the ideology in `docs/reconstruction.md`, then fill in `docs/RECONSTRUCTION.md` with honest
+scores and justifications.
+
+## Phase 1 — Read the brief
+
+Read `docs/reconstruction.md` in full before writing any code. Pay particular attention to:
+- **Non-negotiable ideology / Convictions** — these are the aesthetic and architectural beliefs
+  you must express, not just implement. Every significant design decision should be traceable
+  to one of these convictions.
+- **Non-negotiable ideology / Constraints** — hard rules that must never be violated.
+- **What must survive any implementation** — the core interfaces and behaviors the original
+  team considers load-bearing.
+- **What you are free to change** — explicit permission to diverge. Use it.
+- **What you should question** — the original team's own doubts. These are invitations to improve.
+- **Comparison rubric** — how your implementation will be evaluated.
+
+## Phase 2 — Plan before building
+
+Before writing any code, write a brief plan (can be inline notes):
+- Which convictions are most constraining for your architecture choices?
+- Where will you deliberately diverge? Which conviction supports each divergence?
+- Which "should question" items will you improve?
+
+## Phase 3 — Build
+
+Build the implementation. As you work:
+- If you make a design choice that diverges from the fingerprints, note it.
+- If you improve something from the "should question" list, note how and why.
+- You are not trying to clone the original — you are expressing the same ideology.
+
+## Phase 4 — Fill in the scoring report
+
+When your implementation is complete, fill in `docs/RECONSTRUCTION.md`:
+- For each conviction: did you express it? Where? Any deliberate departures?
+- For each constraint: how does your implementation satisfy it?
+- For each rubric dimension: honest score with concrete evidence.
+- For each "should question" item: what did you do and why?
+- Divergences section: list significant differences from the original fingerprints.
+- Summary verdict: overall alignment, recommended use, key insight for the original team.
+
+## Constraints
+
+- Do not ask the original team for implementation details — work only from the brief.
+- Do not read the original codebase unless it is explicitly provided alongside this brief.
+- Your divergences are the point of the exercise. Do not apologise for them.
+- The scoring report must be honest. A "Below original" score with good justification is
+  more valuable than an inflated score.

@@ -1,0 +1,249 @@
+# Ideology — {{ project_name }}
+
+> This document captures the **intent layer** beneath the implementation.
+> It records convictions, tradeoffs, and constraints in a form that survives across
+> implementations, agents, and sessions.
+>
+> A reconstruction agent given only this document and `docs/brief.md` should be able to
+> produce an implementation that is recognizably this project — different in form, identical
+> in values.
+>
+> Fill this in before the first story if starting fresh. Fill it in by extracting from the
+> existing implementation if a prototype already exists.
+
+---
+
+## Core convictions
+
+> What does this project believe? State each conviction as a positive claim: "we prefer X over Y
+> because Z." These are not rules — they are the values from which rules derive.
+> A conviction should be strong enough to resolve a tradeoff when two good options conflict.
+
+<!--
+Examples:
+- "We prefer explicit configuration over inferred defaults, because configuration that can be
+  read is configuration that can be understood by the next agent."
+- "We prefer correctness over performance at this stage, because an incorrect fast system
+  cannot be trusted to optimize."
+- "We prefer small composable functions over large orchestrators, because the unit of
+  replaceability matters more than the unit of convenience."
+
+Add one conviction per bullet. State the preference and the reason. Three to seven convictions
+is the right range — fewer suggests the ideology is underdeveloped; more suggests it is not
+actually a set of convictions but a list of preferences.
+-->
+
+{% if convictions %}
+{% for conviction in convictions %}
+- {{ conviction }}
+{% endfor %}
+{% else %}
+- _(not yet specified — fill in before first story or extract from prototype)_
+{% endif %}
+
+---
+
+## Value hierarchy
+
+> When values conflict, which wins? Record the priority order and the reasoning.
+> This section is most useful when populated from real conflict — a moment when two
+> good values pointed in opposite directions and a decision was made.
+
+<!--
+Format each entry as:
+  [Higher value] over [lower value] — [the situation where this matters] — [why]
+
+Examples:
+- "Auditability over convenience — when logging a decision requires extra code, write
+  the extra code. A system that cannot explain itself cannot be trusted."
+- "Backward compatibility over refactoring clarity — at this stage, existing integrations
+  must not break. Clean-up is for a future phase when the API surface is stable."
+- "Reversibility over speed — prefer designs where bad decisions can be undone. Move fast
+  in a direction that can be walked back."
+-->
+
+{% if value_hierarchy %}
+{% for entry in value_hierarchy %}
+- {{ entry }}
+{% endfor %}
+{% else %}
+- _(not yet specified — record conflicts as they arise; do not invent hierarchy that hasn't been tested)_
+{% endif %}
+
+---
+
+## Accepted constraints
+
+> Non-negotiables with their rationale. Not just the rule — the reason the rule exists
+> and what it protects. A constraint without a rationale will be violated by the first
+> agent that encounters a situation the rule author did not anticipate.
+
+<!--
+Format each entry as:
+
+### [Constraint name]
+
+**Rule:** [What must never happen, or what must always be true]
+
+**Protects:** [What breaks, degrades, or becomes untrustworthy if this constraint is violated]
+
+**Rationale:** [Why this protection is worth the cost it imposes]
+
+**Override path:** [Under what conditions, if any, can this constraint be deliberately overridden?
+  If never: say "no override permitted." If conditional: describe the gate.]
+-->
+
+{% if constraints %}
+{% for constraint in constraints %}
+### {{ constraint.name }}
+
+**Rule:** {{ constraint.rule }}
+
+**Protects:** {{ constraint.protects }}
+
+**Rationale:** {{ constraint.rationale }}
+
+**Override path:** {{ constraint.override_path | default("Document the exception in spec.json conflicts with a stated reason before proceeding.") }}
+
+{% endfor %}
+{% else %}
+### _(not yet specified)_
+
+**Rule:** _(add the first non-negotiable here)_
+
+**Protects:** _(what breaks if this rule is violated)_
+
+**Rationale:** _(why the rule exists, not just what it says)_
+
+**Override path:** _(when, if ever, deliberate override is permitted)_
+{% endif %}
+
+---
+
+## Prototype fingerprints
+
+> If this ideology document was written after a prototype already exists, record the patterns,
+> habits, and choices in the prototype that reflect the developer's style rather than the
+> project's values. A reconstruction agent should understand which patterns are free to change.
+>
+> If this document was written before any prototype: leave this section blank and fill it
+> in during or after the first implementation.
+
+<!--
+The goal is to distinguish "this is how we believe the system should work" from "this is
+how I happen to build things." A reconstruction agent that inherits only the fingerprints
+without knowing they are fingerprints will treat them as constraints. Name them explicitly
+so they can be questioned.
+
+Format:
+
+### [Pattern name]
+
+**Observed in prototype:** [Where in the codebase this pattern appears]
+
+**Why it exists:** [Developer preference? Convenience? Legacy? Genuine conviction?]
+
+**Free to change?** Yes / Conditional / No — [reason]
+-->
+
+{% if fingerprints %}
+{% for fp in fingerprints %}
+### {{ fp.name }}
+
+**Observed in prototype:** {{ fp.observed }}
+
+**Why it exists:** {{ fp.reason }}
+
+**Free to change?** {{ fp.changeable }}
+
+{% endfor %}
+{% else %}
+_(No prototype fingerprints recorded. If a prototype exists, review it for patterns that
+reflect developer habit rather than project values and record them here.)_
+{% endif %}
+
+---
+
+## Reconstruction guidance
+
+> Instructions for an agent reconstructing this system from ideology alone — without access
+> to the original source code.
+
+### Must preserve
+
+> These elements are non-negotiable. An implementation that omits or contradicts them is
+> not this project.
+
+{% if must_preserve %}
+{% for item in must_preserve %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- _(Derive from the accepted constraints above. Each constraint with "no override permitted"
+  maps to a must-preserve item here. List them explicitly so the reconstruction agent does
+  not need to infer them.)_
+{% endif %}
+
+### Should question
+
+> These elements are present in the current implementation but may not be the best approach.
+> A reconstruction agent is encouraged to find a better solution — and should justify the
+> change against the core convictions above.
+
+{% if should_question %}
+{% for item in should_question %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- _(Record here: awkward abstractions, technical debt accepted under time pressure, designs
+  that solved the immediate problem but may not scale. These are gifts to the reconstruction
+  agent — honesty about what the prototype got wrong.)_
+{% endif %}
+
+### Free to change
+
+> Implementation details the reconstruction agent should feel no obligation to preserve.
+> These were choices, not values.
+
+{% if free_to_change %}
+{% for item in free_to_change %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- _(Language, framework, file layout, naming conventions, test structure — unless any of
+  these appear in the accepted constraints above, they are free to change. Name them
+  explicitly to give the reconstruction agent confidence to diverge.)_
+{% endif %}
+
+---
+
+## Comparison basis
+
+> When two implementations are compared against this ideology, these are the dimensions that
+> matter. Used by the comparison rubric to evaluate which implementation is better aligned
+> with intent.
+
+<!--
+List three to five dimensions. Each should be a quality that can be assessed from reading
+the code — not a feature checklist. Examples:
+- "Constraint traceability: can a reader determine why a given protection exists?"
+- "Intent legibility: does the code explain what it is protecting and why?"
+- "Lesson integration: does the system make it easy to learn from failures?"
+-->
+
+{% if comparison_dimensions %}
+{% for dim in comparison_dimensions %}
+- **{{ dim.name }}:** {{ dim.description }}
+{% endfor %}
+{% else %}
+- _(Derive from the core convictions. Each conviction implies a dimension: a project that
+  believes in explicit configuration should be evaluated on how well its configuration is
+  documented and traceable.)_
+{% endif %}
+
+---
+
+*This document is a companion to `docs/brief.md` (what and why) and `docs/architecture.md`
+(how). Together they form the complete ideology record for {{ project_name }}.*
+
+*Last reviewed: {{ last_reviewed | default("_(not yet reviewed)_") }}*

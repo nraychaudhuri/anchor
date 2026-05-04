@@ -1,0 +1,10 @@
+# {{ project_name }} — Phase Index
+
+This document is the index of all build phases for the project.
+Each phase has a dedicated file in `docs/phases/`.
+
+| Phase | Title | Status | Link |
+|-------|-------|--------|------|
+{% for phase in phases -%}
+| {{ phase.id }} | {{ phase.title }} | {{ phase.status }} | [{{ phase.file }}]({{ phase.file }}) |
+{% endfor %}

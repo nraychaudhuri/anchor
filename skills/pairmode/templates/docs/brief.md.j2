@@ -1,0 +1,76 @@
+# Brief — {{ project_name }}
+
+> This is a one-page project brief. It answers **what** and **why**.
+> Design decisions and implementation choices belong in `docs/architecture.md`.
+
+---
+
+## What this project produces
+
+{{ what if what else "_(not yet specified)_" }}
+
+---
+
+## Why it exists
+
+{{ why if why else "_(not yet specified)_" }}
+
+---
+
+## Core beliefs
+
+> What does this project believe? State convictions as positive claims.
+> These are the values that shaped the design — what the project prefers and why.
+
+{{ core_beliefs if core_beliefs else "_(not yet specified — what does this project believe about how software should be built? What does it value over what?)_" }}
+
+---
+
+## Accepted tradeoffs
+
+> Decisions that had a real cost. What was given up, and why the exchange was worth it.
+> A second implementation should understand what alternatives were considered and rejected.
+
+{{ accepted_tradeoffs if accepted_tradeoffs else "_(not yet specified — what did the project explicitly give up? What was the rationale?)_" }}
+
+---
+
+## Constraints
+
+_Explicit constraints the operator has placed on scope or approach:_
+
+- _(add operator constraints here)_
+
+---
+
+## Not in scope
+
+_Things that might seem related but are intentional omissions:_
+
+- _(add out-of-scope items here)_
+
+---
+
+## What a second implementation must preserve
+
+> The irreducible requirements. An implementation that violates these is not this project.
+> Everything else is negotiable.
+
+{{ must_preserve_str if must_preserve_str else "_(not yet specified — which values, constraints, or behaviors must survive across any implementation of this project?)_" }}
+
+---
+
+## Operator contact
+{% if operator_contact %}
+{{ operator_contact }}
+{% else %}
+_(not specified)_
+{% endif %}
+
+---
+
+_These three documents should be sufficient for any model or toolchain to cold-start this project and reproduce a valid variant without prior session context._
+
+- `docs/brief.md` — what and why (operator intent)
+- `docs/architecture.md` — how and architectural decisions
+- Current phase file from `docs/phases/` (or `docs/phase-prompts.md` for legacy projects)

@@ -1,0 +1,75 @@
+# {{ project_name }} — Cold-Eyes Review (CER) Backlog
+
+*Last updated: {{ last_updated }}*
+
+This file is the structured triage log for findings from external cold-eyes reviews.
+Each finding is assigned to one quadrant. Findings are not deleted — resolved findings
+remain in place with a resolution note.
+
+---
+
+## Do Now
+
+Urgent and important. Blocks correctness, security, or the next phase.
+
+| ID | Finding | Source | Date | Phase |
+|----|---------|--------|------|-------|
+{% set do_now = cer_entries | selectattr("quadrant", "equalto", "do_now") | list %}
+{% if do_now %}
+{% for entry in do_now %}
+| {{ entry.id }} | {{ entry.finding }} | {{ entry.source }} | {{ entry.date }} | {{ entry.phase if entry.phase is defined and entry.phase else "—" }} |
+{% endfor %}
+{% else %}
+| — | *(none)* | — | — | — |
+{% endif %}
+
+---
+
+## Do Later
+
+Important, not urgent. Quality improvements, architectural refinements.
+
+| ID | Finding | Source | Date | Phase |
+|----|---------|--------|------|-------|
+{% set do_later = cer_entries | selectattr("quadrant", "equalto", "do_later") | list %}
+{% if do_later %}
+{% for entry in do_later %}
+| {{ entry.id }} | {{ entry.finding }} | {{ entry.source }} | {{ entry.date }} | {{ entry.phase if entry.phase is defined and entry.phase else "—" }} |
+{% endfor %}
+{% else %}
+| — | *(none)* | — | — | — |
+{% endif %}
+
+---
+
+## Do Much Later
+
+Not urgent, marginal value. Style, cosmetics, speculative improvements.
+
+| ID | Finding | Source | Date | Phase |
+|----|---------|--------|------|-------|
+{% set do_much_later = cer_entries | selectattr("quadrant", "equalto", "do_much_later") | list %}
+{% if do_much_later %}
+{% for entry in do_much_later %}
+| {{ entry.id }} | {{ entry.finding }} | {{ entry.source }} | {{ entry.date }} | {{ entry.phase if entry.phase is defined and entry.phase else "—" }} |
+{% endfor %}
+{% else %}
+| — | *(none)* | — | — | — |
+{% endif %}
+
+---
+
+## Do Never
+
+Rejected findings. Record the rejection reason so it is not re-raised.
+
+| ID | Finding | Source | Date | Phase | Resolution |
+|----|---------|--------|------|-------|------------|
+{% set do_never = cer_entries | selectattr("quadrant", "equalto", "do_never") | list %}
+{% if do_never %}
+{% for entry in do_never %}
+| {{ entry.id }} | {{ entry.finding }} | {{ entry.source }} | {{ entry.date }} | {{ entry.phase if entry.phase is defined and entry.phase else "—" }} | {{ entry.resolution if entry.resolution is defined and entry.resolution else "—" }} |
+{% endfor %}
+{% else %}
+| — | *(none)* | — | — | — | — |
+{% endif %}

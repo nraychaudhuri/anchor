@@ -154,6 +154,68 @@ print('saved')
 
 ---
 
+## Step 2.5 — Pairmode story context (optional)
+
+After saving the loaded modules, check if pairmode is active:
+
+```bash
+ls .claude/settings.deny-rationale.json 2>/dev/null && echo "pairmode" || echo "no-pairmode"
+```
+
+If pairmode is active, use AskUserQuestion:
+```
+question: "Which story are you working on? (enter an ID like '2.3', or leave blank to skip)"
+options: ["Skip"]
+```
+
+If the user provides a story ID (not "Skip" and not blank), write it to state:
+```bash
+uv run python -c "
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path('${CLAUDE_SKILL_DIR}').parent.parent.parent))
+from skills.pairmode.scripts.story_context import set_current_story
+companion_dir = Path('.companion')
+story_id = sys.argv[1]
+title = sys.argv[2] if len(sys.argv) > 2 else None
+set_current_story(companion_dir, story_id, title=title)
+print('story context saved')
+" <story-id>
+```
+
+If the user skips, do not modify state.json — the `current_story` field simply remains absent.
+
+### state.json schema
+
+`.companion/state.json` supports the following fields:
+
+```json
+{
+  "pairmode_version": "1.0",
+  "last_loaded_modules": ["module-name"],
+  "current_story": {
+    "id": "2.3",
+    "title": "optional title",
+    "set_at": "2026-04-20T00:00:00+00:00"
+  }
+}
+```
+
+- `last_loaded_modules` — set on every companion session start; lists the module names
+  the user chose to load.
+- `current_story` — **optional**; only present when the project has pairmode active and
+  the user confirmed which story they are working on. Contains the story `id` (required),
+  an optional `title`, and the `set_at` UTC ISO-8601 timestamp when it was recorded.
+  When the user skips the prompt this field is absent and state.json is not modified.
+- `pairmode_version` — set by `/anchor:pairmode bootstrap` to record which methodology
+  version was used to scaffold the project.
+
+The `story_context` helper module (`skills/pairmode/scripts/story_context.py`) provides
+`set_current_story`, `get_current_story`, `clear_current_story`, `is_pairmode_active`,
+`read_state`, and `write_state` for use in skills and tests.
+
+---
+
 ## Step 3 — Start the sidebar
 
 Now that state.json has the loaded modules, start the sidebar:

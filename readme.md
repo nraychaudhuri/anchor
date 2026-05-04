@@ -83,7 +83,49 @@ claude --plugin-dir /path/to/anchor
 
 The first time the companion sidebar starts, it will run `claude setup-token` interactively in the companion terminal to generate an OAuth token. This uses your existing Claude subscription — no extra API costs. The token is saved to `~/.anchor/auth.json` and reused automatically.
 
-## The Two Commands
+## The Three Skills
+
+### `/anchor:pairmode` — Structured build methodology (for teams and self-directed builders)
+
+A complete builder/reviewer workflow that any project can adopt. Pairmode turns Claude Code into a disciplined pair — specifications are written first, builders implement against them, and reviewers enforce acceptance criteria at every commit.
+
+**Era 2 — Ideology capture:** Pairmode now captures not just what you're building and how, but _why_ — the convictions, tradeoffs, and constraints that define your project's intent. A blank-slate agent given only the ideology document and the brief should be able to reconstruct an implementation that is recognizably the same project.
+
+```bash
+# Bootstrap a new project with the pairmode scaffold
+# (TTY mode guides you through ideology capture interactively)
+/anchor:pairmode bootstrap
+
+# Pass convictions directly without TTY prompts
+/anchor:pairmode bootstrap --conviction "we prefer X over Y because Z" --constraint "never write state from hooks"
+
+# Seed a new pairmode project from an existing reconstruction.md brief (skips TTY ideology capture)
+/anchor:pairmode bootstrap --from-reconstruction path/to/reconstruction.md
+
+# Audit how far a project has drifted from canonical templates (detects stale ideology.md and reconstruction.md)
+/anchor:pairmode audit
+
+# Apply upstream methodology updates (with per-change confirmation prompts)
+/anchor:pairmode sync
+
+# Capture a methodology insight as a lesson
+/anchor:pairmode lesson
+
+# Review accumulated lessons and update templates
+/anchor:pairmode review
+
+# Refresh docs/reconstruction.md from ideology.md + brief.md (handoff for blank-slate agent)
+/anchor:pairmode reconstruct
+
+# Render a pre-populated RECONSTRUCTION.md scoring report for a reconstruction agent to fill in
+/anchor:pairmode score
+```
+
+The scaffold produces: `CLAUDE.md`, `CLAUDE.build.md`, `docs/` (brief, architecture, ideology, reconstruction, phases, CER backlog), `.claude/agents/` (builder, reviewer, loop-breaker, security-auditor, intent-reviewer), and `.claude/settings.json` with a spec-derived deny list.
+
+Phases are tracked individually in `docs/phases/phase-N.md`. A CER triage backlog (`docs/cer/backlog.md`) captures findings that cannot be resolved immediately.
+
+---
 
 ### `/anchor:seed` — Bootstrap (run once)
 
@@ -247,6 +289,29 @@ anchor/
         sidebar.py           ← companion sidebar process
         start_sidebar.sh     ← shell launcher
         launch_sidebar.command  ← macOS Terminal launcher + OAuth setup
+    pairmode/
+      SKILL.md               ← /anchor:pairmode
+      requirements.txt
+      templates/             ← Jinja2 scaffold templates
+        CLAUDE.md.j2
+        CLAUDE.build.md.j2
+        docs/brief.md.j2
+        docs/architecture.md.j2
+        docs/phases/index.md.j2
+        docs/phases/phase.md.j2
+        docs/cer/backlog.md.j2
+        .claude/settings.json.j2
+        agents/builder.md.j2
+        agents/reviewer.md.j2
+        agents/loop-breaker.md.j2
+        agents/security-auditor.md.j2
+        agents/intent-reviewer.md.j2
+      scripts/
+        bootstrap.py         ← scaffold writer
+        audit.py             ← drift detector
+        sync.py              ← update applier (with confirmation)
+        cer.py               ← CER triage CLI
+        phase_new.py         ← per-phase file creator
   hooks/
     hooks.json               ← hook configuration
     stop.py                  ← Historian: incremental capture

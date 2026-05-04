@@ -1,0 +1,58 @@
+{
+  "module": "pairmode-skill",
+  "summary": "The pairmode-skill module provides a structured builder/reviewer workflow that any project can adopt via the anchor plugin. It generates a complete pairmode scaffold (CLAUDE.md, CLAUDE.build.md, agent definitions, docs templates, and Claude Code permission settings) from Jinja2 templates, deriving the reviewer checklist and Claude Code deny list directly from the project's existing Anchor spec non-negotiables and business rules. It also manages the lifecycle of methodology improvements through lesson capture, lesson review, audit (diff a project against the current canonical methodology), and sync (apply canonical deltas non-destructively). The core design principle is that protection rules are never hand-written \u2014 they are mechanically derived from spec constraints, carry traceable rationale, and can be regenerated when the spec changes.",
+  "business_rules": [
+    "bootstrap must read .companion/product.json and, via a two-hop path (product.json['config'] \u2192 config['spec_location']), locate all openspec/specs/*/spec.json files before generating any output",
+    "bootstrap must present the full list of files to be written and prompt for explicit user confirmation before writing anything; existing files must not be overwritten without a per-file confirmation",
+    "when a project spec is present, the reviewer checklist must be derived from spec non-negotiables (CRITICAL severity) and business rules (HIGH severity); universal items PROTECTED FILES, STORY SCOPE, and BUILD GATE are always appended by the Jinja2 templates and must not be passed via the checklist_items context variable to avoid duplication",
+    "when a project spec is present and module path mappings exist in .companion/modules.json, the Claude Code deny list must be derived from non-negotiables that contain protection keywords (must never, must not, protected, immutable, isolation, never); concept keywords (auth, schema, engine) extend protection cross-module to any path containing that word",
+    "when no spec is present, or when a spec is present but no module path mappings yield any derived rules, bootstrap must fall back to the static DEFAULT_DENY list",
+    "bootstrap must write a settings.deny-rationale.json sidecar alongside .claude/settings.json that maps each deny rule back to its source non-negotiable and module, providing an audit trail for every permission restriction",
+    "bootstrap must record pairmode_version in .companion/state.json after writing scaffold files",
+    "checklist deriver must deduplicate identical rule texts across modules by merging module names into a comma-separated list rather than emitting duplicate items",
+    "denylist deriver must emit one Edit and one Write deny rule per protected path, and must deduplicate on (path_pattern, non_negotiable) to avoid repeats",
+    "lessons are append-only: existing lesson entries may only have their status field updated; any other field mutation must raise an error",
+    "the audit command must diff a project's scaffold files against canonically rendered templates at the current pairmode version, classifying deltas as MISSING, INCONSISTENT, or EXTRA (project-specific), and must never write files",
+    "the sync command must apply MISSING and INCONSISTENT deltas from an audit result while preserving all EXTRA project-specific content; it must update pairmode_version and last_sync in state.json after completing"
+  ],
+  "non_negotiables": [
+    "hooks must never be modified by pairmode-skill scripts; hooks are thin relays and are a protected subsystem",
+    "pairmode bootstrap must never overwrite existing project files without explicit per-file user confirmation",
+    "lessons.json is append-only; no existing lesson field other than status may ever be modified by any pairmode script",
+    "spec files (openspec/specs/*/spec.json) must never be written by bootstrap, checklist_deriver, or denylist_deriver; those modules are read-only consumers of spec data",
+    "the deny list and rationale sidecar must always be consistent: every entry in settings.json permissions.deny that was derived by pairmode must have a corresponding entry in settings.deny-rationale.json",
+    "templates must render correctly for projects with no prior Anchor spec (blank-slate bootstrap with empty derived lists); a missing spec is a valid, non-error state",
+    "all pairmode scripts must use uv run for Python execution and must only import packages listed in skills/pairmode/requirements.txt (jinja2, click) plus stdlib",
+    "all path resolution in pairmode scripts must use paths relative to __file__ or passed arguments; no hardcoded absolute paths"
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Deny list rationale is written to a separate sidecar file (settings.deny-rationale.json) rather than as inline comments in settings.json",
+      "reason": "JSON does not support comments; a sidecar preserves machine-readability of settings.json while still providing a human-readable and machine-queryable audit trail linking each rule to its source non-negotiable",
+      "accepted_cost": "Two files must be kept in sync; tooling that reads only settings.json will not see the rationale"
+    },
+    {
+      "decision": "Universal checklist items (PROTECTED FILES, STORY SCOPE, BUILD GATE) are hardcoded in Jinja2 templates rather than passed through the checklist_items context variable",
+      "reason": "Guarantees these items always appear regardless of spec content, prevents duplication when bootstrap passes spec-derived items separately, and makes the canonical items visible in the template source rather than hidden in Python logic",
+      "accepted_cost": "Universal items cannot be suppressed or reordered from Python without editing the templates directly"
+    },
+    {
+      "decision": "Spec derivation uses keyword matching on non-negotiable text to trigger path protection rather than an explicit schema field in spec.json",
+      "reason": "Avoids requiring projects to annotate their specs with a new protection field; extraction is automatic from natural-language constraints already present in the spec",
+      "accepted_cost": "Keyword matching can produce false positives or miss protection intent expressed with unusual phrasing; concept keyword list (auth, schema, engine) is static and must be manually extended as new domain patterns emerge"
+    },
+    {
+      "decision": "bootstrap.py falls back to DEFAULT_DENY when a spec is present but yields no derived deny rules (e.g. no module paths in modules.json)",
+      "reason": "Ensures every bootstrapped project has at least minimal protection of the methodology files (CLAUDE.md, agent definitions, architecture.md) even when spec derivation cannot run",
+      "accepted_cost": "A project with a spec but no path mappings silently gets the generic deny list rather than a spec-tailored one, with no warning to the user"
+    },
+    {
+      "decision": "The pairmode_version is a simple semver string recorded in .companion/state.json rather than a content hash of the rendered templates",
+      "reason": "Simpler to implement and reason about; version bumps are intentional and developer-controlled rather than automatic on any template change",
+      "accepted_cost": "A project bootstrapped with v0.1.0 and a project re-bootstrapped after a template-only fix with the same version string appear identical to the audit command even if their scaffold content differs"
+    }
+  ],
+  "conflicts": [],
+  "lineage": [],
+  "last_updated": "2026-04-19"
+}

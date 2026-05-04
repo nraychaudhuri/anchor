@@ -1,0 +1,17 @@
+# {{ project_name }} Pairmode — Checkpoints
+
+Each checkpoint is tagged after all stories in the phase pass the full checkpoint sequence
+(build gate → security audit → intent review).
+
+---
+
+## cp1-[phase-name]-complete
+
+**Phase:** 1 — [Phase title]
+**Tag command:** `git tag cp1-[phase-name]-complete && git push origin cp1-[phase-name]-complete`
+**Acceptance:** [Describe what must be true before this checkpoint can be tagged.
+List the key capabilities that must work, and confirm all Phase 1 tests pass.]
+
+---
+
+_(Add a checkpoint section for each phase. Tag only after full checkpoint sequence passes.)_

@@ -1,0 +1,326 @@
+{
+  "generated_by": "anchor:pairmode",
+  "pairmode_version": "0.1.0",
+  "rules": [
+    {
+      "pattern": "Edit(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "The sidebar MUST NOT write directly to spec files as a side effect of capture or conflict detection \u2014 captures go only to openspec/changes/<session_id>/incremental.json."
+    },
+    {
+      "pattern": "Write(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "The sidebar MUST NOT write directly to spec files as a side effect of capture or conflict detection \u2014 captures go only to openspec/changes/<session_id>/incremental.json."
+    },
+    {
+      "pattern": "Edit(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "The sidebar MUST NOT make LLM calls synchronously in the main pipe-reading loop; all LLM work MUST run in daemon threads to avoid blocking the event pipe."
+    },
+    {
+      "pattern": "Write(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "The sidebar MUST NOT make LLM calls synchronously in the main pipe-reading loop; all LLM work MUST run in daemon threads to avoid blocking the event pipe."
+    },
+    {
+      "pattern": "Edit(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "Hook scripts MUST NOT block; the sidebar is the blocking process and hooks are thin relays that write to the pipe only."
+    },
+    {
+      "pattern": "Write(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "Hook scripts MUST NOT block; the sidebar is the blocking process and hooks are thin relays that write to the pipe only."
+    },
+    {
+      "pattern": "Edit(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "Skill scripts MUST use ${CLAUDE_SKILL_DIR}-relative paths for cross-skill references, never hardcoded absolute paths."
+    },
+    {
+      "pattern": "Write(skills/companion/**)",
+      "module": "companion-skill",
+      "non_negotiable": "Skill scripts MUST use ${CLAUDE_SKILL_DIR}-relative paths for cross-skill references, never hardcoded absolute paths."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "architecture.md must never be allowed to drift from the actual implementation \u2014 it is the source of truth and a diverged architecture doc is a CRITICAL integrity failure."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "architecture.md must never be allowed to drift from the actual implementation \u2014 it is the source of truth and a diverged architecture doc is a CRITICAL integrity failure."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The hook architecture non-negotiable documented in architecture.md (hooks are thin relays only, no API calls, no direct spec writes) must never be contradicted or softened in any revision of the doc."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The hook architecture non-negotiable documented in architecture.md (hooks are thin relays only, no API calls, no direct spec writes) must never be contradicted or softened in any revision of the doc."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The append-only invariant for spec lineage and lessons.json must be explicitly stated in architecture.md and must never be removed from it."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The append-only invariant for spec lineage and lessons.json must be explicitly stated in architecture.md and must never be removed from it."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "phase-prompts.md must never be edited to retroactively change a story's acceptance criterion after that story has been completed \u2014 doing so breaks the audit trail of what was actually built."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "phase-prompts.md must never be edited to retroactively change a story's acceptance criterion after that story has been completed \u2014 doing so breaks the audit trail of what was actually built."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "Checkpoints in checkpoints.md must never be removed once created; they are permanent phase-boundary records."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "Checkpoints in checkpoints.md must never be removed once created; they are permanent phase-boundary records."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The protected files list in architecture.md must stay in sync with the protected files list enforced in CLAUDE.md \u2014 a discrepancy between the two is a CRITICAL configuration error."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The protected files list in architecture.md must stay in sync with the protected files list enforced in CLAUDE.md \u2014 a discrepancy between the two is a CRITICAL configuration error."
+    },
+    {
+      "pattern": "Edit(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The layer rules table in architecture.md (hooks may not import from skills; skills may not call hooks) must never be relaxed without an explicit recorded architectural decision."
+    },
+    {
+      "pattern": "Write(docs/**)",
+      "module": "docs",
+      "non_negotiable": "The layer rules table in architecture.md (hooks may not import from skills; skills may not call hooks) must never be relaxed without an explicit recorded architectural decision."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never make API calls of any kind."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never make API calls of any kind."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never spawn subprocesses or perform any operation that could block for more than a few milliseconds."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never spawn subprocesses or perform any operation that could block for more than a few milliseconds."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never write directly to spec files, openspec files, or any file under the .companion/ directory \u2014 with the sole exception that session_end writes the closed-session marker to state.json."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never write directly to spec files, openspec files, or any file under the .companion/ directory \u2014 with the sole exception that session_end writes the closed-session marker to state.json."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never perform extraction, conflict detection, UML generation, or any other analytical logic; those responsibilities belong exclusively to the sidebar."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never perform extraction, conflict detection, UML generation, or any other analytical logic; those responsibilities belong exclusively to the sidebar."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never suppress or auto-approve a Claude Code permission prompt (e.g. ExitPlanMode); the decision must always be passed back to the normal Claude Code approval UI."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "Hooks must never suppress or auto-approve a Claude Code permission prompt (e.g. ExitPlanMode); the decision must always be passed back to the normal Claude Code approval UI."
+    },
+    {
+      "pattern": "Edit(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "The hooks.json registration file must not be modified without an explicit architectural reason, as it is a protected file governing which lifecycle events anchor intercepts."
+    },
+    {
+      "pattern": "Write(hooks/**)",
+      "module": "hooks",
+      "non_negotiable": "The hooks.json registration file must not be modified without an explicit architectural reason, as it is a protected file governing which lifecycle events anchor intercepts."
+    },
+    {
+      "pattern": "Edit(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "Lessons are append-only. Existing lesson entries must never be deleted or have any field other than status modified."
+    },
+    {
+      "pattern": "Write(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "Lessons are append-only. Existing lesson entries must never be deleted or have any field other than status modified."
+    },
+    {
+      "pattern": "Edit(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "lessons.json must never be written by hooks. Only skill scripts (lesson.py, lesson_review.py) may write to it."
+    },
+    {
+      "pattern": "Write(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "lessons.json must never be written by hooks. Only skill scripts (lesson.py, lesson_review.py) may write to it."
+    },
+    {
+      "pattern": "Edit(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "lessons.json must never be written by sidebar.py or any companion-layer code."
+    },
+    {
+      "pattern": "Write(lessons/**)",
+      "module": "lessons",
+      "non_negotiable": "lessons.json must never be written by sidebar.py or any companion-layer code."
+    },
+    {
+      "pattern": "Edit(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "hooks must never be modified by pairmode-skill scripts; hooks are thin relays and are a protected subsystem"
+    },
+    {
+      "pattern": "Write(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "hooks must never be modified by pairmode-skill scripts; hooks are thin relays and are a protected subsystem"
+    },
+    {
+      "pattern": "Edit(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "hooks must never be modified by pairmode-skill scripts; hooks are thin relays and are a protected subsystem"
+    },
+    {
+      "pattern": "Write(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "hooks must never be modified by pairmode-skill scripts; hooks are thin relays and are a protected subsystem"
+    },
+    {
+      "pattern": "Edit(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "pairmode bootstrap must never overwrite existing project files without explicit per-file user confirmation"
+    },
+    {
+      "pattern": "Write(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "pairmode bootstrap must never overwrite existing project files without explicit per-file user confirmation"
+    },
+    {
+      "pattern": "Edit(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "pairmode bootstrap must never overwrite existing project files without explicit per-file user confirmation"
+    },
+    {
+      "pattern": "Write(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "pairmode bootstrap must never overwrite existing project files without explicit per-file user confirmation"
+    },
+    {
+      "pattern": "Edit(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "spec files (openspec/specs/*/spec.json) must never be written by bootstrap, checklist_deriver, or denylist_deriver; those modules are read-only consumers of spec data"
+    },
+    {
+      "pattern": "Write(skills/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "spec files (openspec/specs/*/spec.json) must never be written by bootstrap, checklist_deriver, or denylist_deriver; those modules are read-only consumers of spec data"
+    },
+    {
+      "pattern": "Edit(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "spec files (openspec/specs/*/spec.json) must never be written by bootstrap, checklist_deriver, or denylist_deriver; those modules are read-only consumers of spec data"
+    },
+    {
+      "pattern": "Write(tests/pairmode/**)",
+      "module": "pairmode-skill",
+      "non_negotiable": "spec files (openspec/specs/*/spec.json) must never be written by bootstrap, checklist_deriver, or denylist_deriver; those modules are read-only consumers of spec data"
+    },
+    {
+      "pattern": "Edit(.claude-plugin/**)",
+      "module": "plugin-manifest",
+      "non_negotiable": "Neither file may be modified without a stated reason \u2014 they are declared protected files in the architecture and any change is a protected-file event requiring explicit justification."
+    },
+    {
+      "pattern": "Write(.claude-plugin/**)",
+      "module": "plugin-manifest",
+      "non_negotiable": "Neither file may be modified without a stated reason \u2014 they are declared protected files in the architecture and any change is a protected-file event requiring explicit justification."
+    },
+    {
+      "pattern": "Edit(.claude-plugin/**)",
+      "module": "plugin-manifest",
+      "non_negotiable": "These files must never be generated, overwritten, or written to by hooks, sidebar.py, or any runtime skill script \u2014 they are static declarations, not runtime artifacts."
+    },
+    {
+      "pattern": "Write(.claude-plugin/**)",
+      "module": "plugin-manifest",
+      "non_negotiable": "These files must never be generated, overwritten, or written to by hooks, sidebar.py, or any runtime skill script \u2014 they are static declarations, not runtime artifacts."
+    },
+    {
+      "pattern": "Edit(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "Lineage entries in spec.json are append-only and must never be rewritten or deleted after creation."
+    },
+    {
+      "pattern": "Write(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "Lineage entries in spec.json are append-only and must never be rewritten or deleted after creation."
+    },
+    {
+      "pattern": "Edit(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "Session mining must not run through Task subagents; it must block in the main agent to guarantee all writes complete before reconciliation begins."
+    },
+    {
+      "pattern": "Write(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "Session mining must not run through Task subagents; it must block in the main agent to guarantee all writes complete before reconciliation begins."
+    },
+    {
+      "pattern": "Edit(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "The reconciler must never overwrite spec content with conflicting information without flagging the contradiction; contradictions go to conflicts_pending.json."
+    },
+    {
+      "pattern": "Write(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "The reconciler must never overwrite spec content with conflicting information without flagging the contradiction; contradictions go to conflicts_pending.json."
+    },
+    {
+      "pattern": "Edit(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "The skill must not write to any hook scripts or protected files; it writes only to .companion/, <spec_location>/openspec/, and product config files under ~/.companion/."
+    },
+    {
+      "pattern": "Write(skills/seed/**)",
+      "module": "seed-skill",
+      "non_negotiable": "The skill must not write to any hook scripts or protected files; it writes only to .companion/, <spec_location>/openspec/, and product config files under ~/.companion/."
+    }
+  ]
+}

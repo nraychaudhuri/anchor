@@ -21,8 +21,10 @@ Conflict actions:
   o = override   (require reason, update spec, archive old rule)
 """
 import asyncio
+import fnmatch
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -47,6 +49,75 @@ except ImportError:
 
 PIPE_PATH = "/tmp/companion.pipe"
 STATE_PATH = ".companion/state.json"
+DENY_RATIONALE_PATH = ".claude/settings.deny-rationale.json"
+
+# Pattern to extract glob from Edit(...) or Write(...) or Bash(...)
+_RULE_RE = re.compile(r'^(?:Edit|Write|Bash)\((.+)\)$')
+
+# Lazy deny-rationale rules cache; keyed by cwd to handle multi-project sidebars.
+_deny_rationale_cache: dict[str, list[dict]] = {}
+
+
+def _load_deny_rationale(cwd: str) -> list[dict]:
+    """Load deny-rationale.json rules lazily; return [] if absent or unparseable.
+
+    Results are cached per cwd so the file is read at most once per sidebar
+    session.  The sidebar runs in a separate async process so this I/O is fine.
+    """
+    if cwd in _deny_rationale_cache:
+        return _deny_rationale_cache[cwd]
+    path = Path(cwd) / DENY_RATIONALE_PATH
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        rules = data.get("rules", [])
+    except Exception:
+        rules = []
+    _deny_rationale_cache[cwd] = rules
+    return rules
+
+
+def _check_protected(file_path: str, cwd: str) -> tuple[bool, str, str]:
+    """Check if *file_path* matches any deny-rationale rule.
+
+    Returns ``(protected, protection_rule, non_negotiable)``.
+    If no match returns ``(False, "", "")``.
+
+    This mirrors the logic that used to live in the post_tool_use hook but
+    was moved here so that the hook remains a zero-I/O thin relay.
+    """
+    if not file_path:
+        return False, "", ""
+
+    rules = _load_deny_rationale(cwd)
+    if not rules:
+        return False, "", ""
+
+    # Normalise path — make relative to cwd if absolute
+    rel_path = file_path
+    if os.path.isabs(file_path):
+        try:
+            rel_path = str(Path(file_path).relative_to(cwd))
+        except ValueError:
+            rel_path = file_path
+
+    for rule in rules:
+        pattern_str = rule.get("pattern", "")
+        m = _RULE_RE.match(pattern_str)
+        if not m:
+            continue
+        glob = m.group(1)
+        if fnmatch.fnmatch(rel_path, glob):
+            return True, pattern_str, rule.get("non_negotiable", "")
+
+    return False, "", ""
+
+
+# Allow importing story_context and spec_exception from the pairmode skill
+_ANCHOR_ROOT = Path(__file__).parent.parent.parent.parent
+if str(_ANCHOR_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ANCHOR_ROOT))
+
+from skills.pairmode.scripts.spec_exception import record_spec_exception  # noqa: E402
 
 console = Console()
 lock = threading.Lock()
@@ -118,6 +189,9 @@ class MiniSession:
 
 _modules_cache = None
 
+# Session-level module boundary tracking
+_touched_modules: set[str] = set()
+
 
 def get_file_module(file_path: str, cwd: str) -> str | None:
     """Map a file path to its owning module using .companion/modules.json."""
@@ -132,6 +206,45 @@ def get_file_module(file_path: str, cwd: str) -> str | None:
             if path.rstrip("/") in file_path:
                 return module["name"]
     return None
+
+
+def _load_modules_list(cwd: str) -> list[dict]:
+    """Load the modules list from .companion/modules.json, returning [] on error."""
+    global _modules_cache
+    if _modules_cache is None:
+        try:
+            _modules_cache = json.loads((Path(cwd) / ".companion" / "modules.json").read_text())
+        except Exception:
+            _modules_cache = []
+    return _modules_cache
+
+
+def track_module_boundary(file_path: str, cwd: str) -> bool:
+    """Record which module a changed file belongs to.
+
+    Uses prefix matching against modules.json paths.  Returns True if a
+    multi-module boundary alert should be shown (i.e. files from more than one
+    module have been touched this session AND current_story is set).
+    """
+    global _touched_modules
+    modules = _load_modules_list(cwd)
+
+    matched: str | None = None
+    for module in modules:
+        for path in module.get("paths", []):
+            if file_path.startswith(path):
+                matched = module.get("name")
+                break
+        if matched:
+            break
+
+    if matched:
+        _touched_modules.add(matched)
+
+    # Only alert when multiple modules touched and current_story is set
+    if len(_touched_modules) > 1 and _current_story:
+        return True
+    return False
 
 
 def build_chart(mini: MiniSession, loaded_modules: list[str]) -> Panel:
@@ -884,6 +997,60 @@ def handle_stop(event: dict):
     render_planning(ts, new_items, new_conflicts)
 
 
+def display_override_prompt(event: dict) -> None:
+    """Display a protected-file override capture prompt.
+
+    Asks the developer for a reason.  If a reason is given, writes a
+    ``spec_exception`` pipe message.  If the user presses *s* (or enters an
+    empty string), no record is written.
+    """
+    file_path = event.get("file_path", event.get("path", ""))
+    non_negotiable = event.get("non_negotiable", "")
+    protection_rule = event.get("protection_rule", "")
+    session_id = event.get("session_id", "")
+    cwd = event.get("cwd", os.getcwd())
+
+    short_path = Path(file_path).name if file_path else file_path
+
+    console.print(
+        Panel(
+            f"  [bold]{short_path}[/bold] was modified\n"
+            f"  [dim]Rule:[/dim] {non_negotiable or protection_rule}\n\n"
+            "  [bold]Reason for override (or press s to skip):[/bold]",
+            title="[bold yellow]Protected File Override[/bold yellow]",
+            border_style="yellow",
+            box=box.ROUNDED,
+        )
+    )
+
+    try:
+        reason = input().strip()
+    except EOFError:
+        reason = ""
+
+    if not reason or reason.lower() == "s":
+        console.print("[dim]  → skipped[/dim]")
+        return
+
+    # Write spec_exception to the pipe
+    try:
+        fd = os.open(PIPE_PATH, os.O_WRONLY | os.O_NONBLOCK)
+        msg = json.dumps(
+            {
+                "type": "spec_exception",
+                "path": file_path,
+                "non_negotiable": non_negotiable,
+                "override_reason": reason,
+                "session_id": session_id,
+            }
+        ) + "\n"
+        os.write(fd, msg.encode())
+        os.close(fd)
+        console.print(f"[dim]  → override reason recorded[/dim]")
+    except (OSError, BlockingIOError):
+        console.print("[yellow]  → could not write to pipe[/yellow]")
+
+
 def handle_post_tool_use(event: dict):
     file_path = event.get("file_path", "")
     loaded_modules = event.get("loaded_modules", [])
@@ -891,6 +1058,28 @@ def handle_post_tool_use(event: dict):
 
     if not file_path:
         return
+
+    # Protected file override capture — classification happens here in the
+    # sidebar (not in the hook) so the hook stays a zero-I/O thin relay.
+    protected, protection_rule, non_negotiable = _check_protected(file_path, cwd)
+    if protected:
+        enriched_event = {
+            **event,
+            "protected": True,
+            "protection_rule": protection_rule,
+            "non_negotiable": non_negotiable,
+        }
+        display_override_prompt(enriched_event)
+
+    # Track module boundaries and emit a warning when multiple modules touched
+    multi_module = track_module_boundary(file_path, cwd)
+    if multi_module:
+        sorted_modules = sorted(_touched_modules)
+        modules_str = ", ".join(sorted_modules)
+        console.print(
+            f"  [yellow]\u26a0 Multi-module: {modules_str}[/yellow]\n"
+            "  [dim]Story scope may be exceeded[/dim]"
+        )
 
     alert = check_file_against_spec(file_path, cwd, loaded_modules)
     render_implementation(file_path, alert)
@@ -1100,8 +1289,58 @@ def get_state() -> dict:
         return {}
 
 
+# ── Story context panel ────────────────────────────────────────────────────────
+
+# In-memory current story; updated on startup and on state_update events
+_current_story: dict | None = None
+
+
+def build_story_panel(story: dict) -> Panel:
+    """Build a Rich Panel showing the current story context.
+
+    Args:
+        story: The current_story dict from state.json.
+               Expected keys: ``id`` (required), ``title`` (optional),
+               ``set_at`` (optional ISO-8601 timestamp).
+
+    Returns:
+        A Rich Panel ready to print.
+    """
+    story_id = story.get("id", "")
+    title = story.get("title", "")
+    set_at = story.get("set_at", "")
+
+    # Format the display label: "Story 2.3 — Title" or just "Story 2.3"
+    if title:
+        label = f"Story {story_id} \u2014 {title}"
+    else:
+        label = f"Story {story_id}"
+
+    # Format started time: extract HH:MM from ISO timestamp if present
+    started = ""
+    if set_at:
+        try:
+            dt = datetime.fromisoformat(set_at)
+            started = dt.strftime("%H:%M")
+        except Exception:
+            started = set_at
+
+    lines = [f"  {label}"]
+    if started:
+        lines.append(f"  [dim]Started: {started}[/dim]")
+
+    return Panel(
+        "\n".join(lines),
+        title="[bold]Story[/bold]",
+        border_style="dim",
+        box=box.ROUNDED,
+    )
+
+
 def render_startup(state: dict):
     """Show the patient chart: loaded modules + non-negotiables (allergies)."""
+    global _current_story
+    _current_story = state.get("current_story")
     loaded_modules = state.get("last_loaded_modules", [])
 
     header_lines = []
@@ -1140,10 +1379,40 @@ def render_startup(state: dict):
             box=box.ROUNDED,
         )
     )
+
+    # Story context panel — only shown when current_story is set
+    if _current_story:
+        console.print(build_story_panel(_current_story))
+
     console.print()
 
 
 def main():
+    import argparse
+    import hashlib
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--project-dir", default=None)
+    args, _ = parser.parse_known_args()
+
+    global PIPE_PATH
+    _project_dir = str(Path(args.project_dir).resolve()) if args.project_dir else str(Path.cwd().resolve())
+    _hash = hashlib.md5(_project_dir.encode()).hexdigest()[:8]
+    PIPE_PATH = f"/tmp/companion-{_hash}.pipe"
+
+    # Write sidebar PID
+    _pid_path = Path(".companion/sidebar.pid")
+    _pid_path.parent.mkdir(parents=True, exist_ok=True)
+    _pid_path.write_text(str(os.getpid()))
+
+    # Write pipe_path into state.json
+    _state_path = Path(STATE_PATH)
+    try:
+        _state = json.loads(_state_path.read_text()) if _state_path.exists() else {}
+    except Exception:
+        _state = {}
+    _state["pipe_path"] = PIPE_PATH
+    _state_path.write_text(json.dumps(_state, indent=2))
+
     # Clear entire screen + move cursor to top — wipes shell login messages
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
@@ -1260,6 +1529,27 @@ def main():
                             # Persist captures — analysis already happened on plan file write
                             threading.Thread(target=handle_exit_plan_mode, args=(event,), daemon=True).start()
 
+                        elif event_type == "state_update":
+                            # Refresh current_story from the event payload
+                            global _current_story
+                            _current_story = event.get("current_story")
+                            if _current_story:
+                                console.print(build_story_panel(_current_story))
+
+                        elif event_type == "mode_change":
+                            mode = event.get("mode", "")
+                            VALID_MODES = {"planning", "implementation"}
+                            if mode not in VALID_MODES:
+                                mode = "planning"  # safe fallback
+                            if mode:
+                                _state_path = Path(STATE_PATH)
+                                try:
+                                    _st = json.loads(_state_path.read_text()) if _state_path.exists() else {}
+                                except Exception:
+                                    _st = {}
+                                _st["mode"] = mode
+                                _state_path.write_text(json.dumps(_st, indent=2))
+
                         elif event_type == "refresh":
                             if live and mini:
                                 live.update(build_chart(mini, loaded_modules))
@@ -1267,7 +1557,36 @@ def main():
                         elif event_type == "session_end":
                             stop_live()
                             console.print(f"[dim]{datetime.now().strftime('%H:%M:%S')} ← session ending...[/dim]")
+                            # Write session-end state synchronously before thread
+                            try:
+                                _sp = Path(STATE_PATH)
+                                _st = json.loads(_sp.read_text()) if _sp.exists() else {}
+                                _st["last_session_end"] = event.get("last_session_end", "")
+                                _st["last_session_id"] = event.get("session_id", "")
+                                _st["last_session_closed"] = event.get("last_session_closed", True)
+                                _st["mode"] = event.get("mode", "planning")
+                                _sp.write_text(json.dumps(_st, indent=2))
+                            except Exception:
+                                pass
                             threading.Thread(target=handle_session_end, args=(event,), daemon=True).start()
+
+                        # spec_exception has type= (not event=) — persist it and record in spec
+                        if event.get("type") == "spec_exception":
+                            session_id = event.get("session_id", "")
+                            persist_capture(event, session_id)
+                            console.print(
+                                f"[dim]  → spec exception persisted: {Path(event.get('path', '')).name}[/dim]"
+                            )
+                            try:
+                                record_spec_exception(
+                                    project_dir=Path(os.getcwd()),
+                                    file_path=event.get("path", ""),
+                                    non_negotiable=event.get("non_negotiable", ""),
+                                    override_reason=event.get("override_reason", ""),
+                                    session_id=session_id,
+                                )
+                            except Exception as _exc:
+                                log_error(f"record_spec_exception error: {_exc}")
 
                     except json.JSONDecodeError:
                         continue

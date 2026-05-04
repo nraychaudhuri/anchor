@@ -1,0 +1,74 @@
+{
+  "module": "companion-skill",
+  "summary": "A Claude Code skill that starts a persistent developer sidebar at session open, loads project module specs into context, checks for unreconciled prior sessions, and launches sidebar.py \u2014 a long-running TUI process that listens on a named pipe for hook events and provides real-time spec compliance monitoring, decision capture, conflict detection, and interactive conflict resolution across planning and implementation phases. The launcher supports cross-platform terminal detection (macOS Terminal/iTerm2 and Linux via gnome-terminal with multi-emulator fallback and nohup last resort), requires uv as a system prerequisite, and provides equivalent launcher scripts per platform.",
+  "business_rules": [
+    "On /companion invocation, the skill MUST present all known modules with git-activity-based suggestions before loading any spec, so the developer consciously selects scope.",
+    "The skill MUST check for unreconciled sessions before loading specs and offer reconciliation; unreconciled incremental.json files represent captured decisions not yet merged into the canonical spec.",
+    "Selected modules and their spec.json contents MUST be written to .companion/state.json before the sidebar starts, so the sidebar inherits the session scope without re-querying the developer.",
+    "If a selected module does not yet exist, the skill MUST prompt the developer to confirm creation and provide a description before writing a skeleton spec.json.",
+    "The sidebar (sidebar.py) MUST listen exclusively on the named pipe /tmp/companion.pipe for all hook events \u2014 it never polls files or registers hooks directly.",
+    "On a 'stop' hook event the sidebar MUST call an LLM (claude-haiku) to extract new decisions, rules, tradeoffs, and conflicts from the last 8 transcript messages and persist them to <spec_location>/openspec/changes/<session_id>/incremental.json.",
+    "On a 'post_tool_use' event the sidebar MUST map the written file to its owning module, flag boundary crossings (files outside loaded modules), and check file content against the module's non_negotiables via LLM.",
+    "On an 'exit_plan_mode' event the sidebar MUST analyze the finalized plan against loaded specs and classify each architectural decision as add, modify, or conflict.",
+    "Detected conflicts MUST be surfaced to the developer as interactive prompts with exactly three dispositions: snooze (discard), record (append to conflicts_pending.json), or override (requires a reason, updates spec in place, archives old rule, appends lineage entry).",
+    "On 'session_end' the sidebar MUST print a summary panel and exit; incremental captures remain on disk for the next /companion reconciliation cycle.",
+    "The sidebar is the sole writer of spec.json files via the override action; all other writes to spec files are prohibited from this module.",
+    "LLM calls MUST use claude-haiku, be capped at 60 seconds, and use max_turns=1 with tools disabled to prevent recursive tool use inside the sidebar.",
+    "The terminal launcher MUST detect the host platform and select an appropriate terminal emulator \u2014 macOS Terminal or iTerm2 on macOS, gnome-terminal (primary) with multi-emulator detection on Linux \u2014 and MUST provide a nohup fallback for unrecognized or headless environments.",
+    "Each supported platform MUST have a dedicated sidebar launcher script providing functional parity; Linux and macOS launcher scripts are treated as first-class peers.",
+    "uv MUST be installed as a system prerequisite before the sidebar process can be started; the skill MUST surface a clear error and installation guidance if uv is absent."
+  ],
+  "non_negotiables": [
+    "sidebar.py is the ONLY component in this module permitted to write to spec.json files, and only via an explicit developer override action with a stated reason.",
+    "The sidebar MUST NOT write directly to spec files as a side effect of capture or conflict detection \u2014 captures go only to openspec/changes/<session_id>/incremental.json.",
+    "The sidebar MUST NOT make LLM calls synchronously in the main pipe-reading loop; all LLM work MUST run in daemon threads to avoid blocking the event pipe.",
+    "Hook scripts MUST NOT block; the sidebar is the blocking process and hooks are thin relays that write to the pipe only.",
+    "The named pipe path /tmp/companion.pipe is the sole inter-process contract between hooks and the sidebar; no other IPC mechanism is permitted.",
+    "Skill scripts MUST use ${CLAUDE_SKILL_DIR}-relative paths for cross-skill references, never hardcoded absolute paths."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "LLM extraction runs on every stop event rather than batched at session end",
+      "reason": "Real-time capture with lower risk of losing decisions if the session is interrupted",
+      "accepted_cost": "Increased API usage per session compared to end-of-session batching"
+    },
+    {
+      "decision": "Captures are written to per-session incremental.json files rather than directly merged into the canonical spec",
+      "reason": "The canonical spec is never mutated mid-session by an unreviewed AI extraction",
+      "accepted_cost": "A manual reconciliation step is required at the next session start via /anchor:companion"
+    },
+    {
+      "decision": "The sidebar is a separate OS process (new terminal window) rather than running inside the Claude Code process",
+      "reason": "The sidebar can maintain a persistent TUI with blocking input for conflict resolution without interfering with Claude's tool execution loop",
+      "accepted_cost": "Cross-platform terminal-launcher complexity requiring platform detection logic, per-platform launcher scripts (macOS Terminal/iTerm2, Linux gnome-terminal with multi-emulator fallback, nohup last resort), and ongoing maintenance burden as new platforms or emulators emerge"
+    },
+    {
+      "decision": "OAuth token is fetched via 'claude setup-token' and cached in ~/.anchor/auth.json on first run",
+      "reason": "Subsequent sidebar launches are non-interactive",
+      "accepted_cost": "A one-time interactive setup step is required on first use"
+    },
+    {
+      "decision": "Module path matching uses substring containment rather than exact prefix matching",
+      "reason": "Simplicity without requiring normalized absolute paths",
+      "accepted_cost": "Potential false-positive module attribution for files with path components that share a name with a module"
+    }
+  ],
+  "conflicts": [],
+  "lineage": [
+    {
+      "session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "summary": "",
+      "date": "2026-04-19",
+      "resume": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "what_changed": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+      "key_decisions": [
+        "Terminal launcher must detect platform and use appropriate terminal emulator; must include fallback for unknown systems",
+        "Platform-specific terminal detection logic with fallback case in start_sidebar.sh",
+        "Create launch_sidebar.sh as Linux equivalent of macOS launch_sidebar.command file",
+        "Add Linux terminal detection to start_sidebar.sh before fallback case",
+        "Install uv as prerequisite for sidebar functionality"
+      ]
+    }
+  ],
+  "last_updated": "2026-04-19"
+}

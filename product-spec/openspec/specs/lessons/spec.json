@@ -1,0 +1,46 @@
+{
+  "module": "lessons",
+  "summary": "The lessons module is anchor's methodology memory store. It captures insights, workflow problems, and corrective patterns discovered during pairmode sessions across projects. Lessons live in the anchor repo itself (not in any project), so they accumulate globally and inform future bootstraps and syncs for all pairmode-managed projects. The module has two artifacts: lessons.json (the authoritative append-only store) and LESSONS.md (a human-readable summary auto-generated from it). Lessons flow into the pairmode methodology through the /anchor:pairmode review command, which reads active lessons, proposes template updates, and marks incorporated lessons as such.",
+  "business_rules": [
+    "Each lesson entry must include: a generated unique id, date, trigger (what situation prompted the lesson), problem (what went wrong or was inefficient), learning (the insight or corrective pattern), methodology_change (how templates or process should change), affects (which project types or contexts this applies to), and status.",
+    "New lessons are captured via /anchor:pairmode lesson, which appends a new entry with status: active to lessons.json.",
+    "The /anchor:pairmode review command loads all status: active lessons, groups them by affects, proposes minimal template updates, and upon user approval writes those updates to skills/pairmode/templates/ and updates lesson status to incorporated.",
+    "The /anchor:pairmode audit command filters lessons.json by the affects field to surface only lessons relevant to the project under audit.",
+    "LESSONS.md is auto-generated from lessons.json and must not be edited directly.",
+    "Lesson status transitions: active -> incorporated (after review approval). No other transitions are defined.",
+    "The pairmode_version in a project's .companion/state.json must be incremented whenever templates are updated as a result of a review cycle.",
+    "lessons.json lives in the anchor repo (lessons/lessons.json), not inside any managed project."
+  ],
+  "non_negotiables": [
+    "Lessons are append-only. Existing lesson entries must never be deleted or have any field other than status modified.",
+    "lessons.json must never be written by hooks. Only skill scripts (lesson.py, lesson_review.py) may write to it.",
+    "lessons.json must never be written by sidebar.py or any companion-layer code.",
+    "The status field is the only mutable field on an existing lesson entry.",
+    "lessons.json must remain valid JSON at all times; partial or corrupted writes are not acceptable."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Lessons are stored in the anchor repo, not in individual projects.",
+      "reason": "Lessons represent methodology improvements that apply across all pairmode-managed projects, not project-specific decisions. Centralising them means a single review cycle can propagate learnings to all future bootstraps and syncs.",
+      "accepted_cost": "Lessons are not versioned per-project. A project bootstrapped before a lesson was incorporated will not automatically receive the update \u2014 it must run /anchor:pairmode sync."
+    },
+    {
+      "decision": "Append-only mutation model with status as the only writable attribute on existing entries.",
+      "reason": "Preserves an auditable history of every lesson ever captured, including lessons that were later superseded or incorporated. Prevents silent rewriting of institutional knowledge.",
+      "accepted_cost": "Stale or incorrect lessons cannot be corrected in place. Corrections must be captured as new lessons that supersede the old ones, which may accumulate noise over time."
+    },
+    {
+      "decision": "LESSONS.md is auto-generated and treated as a derived artifact, not a source of truth.",
+      "reason": "Keeps the machine-readable store (lessons.json) as the single source of truth, while still providing a human-readable view without requiring consumers to parse JSON.",
+      "accepted_cost": "LESSONS.md can become stale if the generation step is not run after every lessons.json write. There is currently no enforced generation trigger."
+    },
+    {
+      "decision": "Lesson applicability is controlled by a free-form affects field rather than a structured taxonomy.",
+      "reason": "Flexibility for capturing lessons across diverse project types without requiring upfront enumeration of all possible project categories.",
+      "accepted_cost": "Filtering by affects in audit is imprecise and depends on string matching or LLM interpretation. Inconsistent affects values across lessons may cause relevant lessons to be missed during audit."
+    }
+  ],
+  "conflicts": [],
+  "lineage": [],
+  "last_updated": "2026-04-19"
+}

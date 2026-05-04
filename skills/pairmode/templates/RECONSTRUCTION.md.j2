@@ -1,0 +1,111 @@
+# Reconstruction Report — {{ project_name }}
+
+> Completed by a blank-slate reconstruction agent working from `docs/reconstruction.md`.
+> This report scores the implementation against the original's comparison rubric.
+
+**Reconstruction date:** {{ reconstruction_date | default("_(not set)_") }}
+**Original project:** {{ project_name }}
+**Stack used:** {{ stack | default("_(not specified)_") }}
+
+---
+
+## Ideology adherence
+
+> For each conviction in the reconstruction brief: did this implementation express it?
+
+{% if convictions %}
+{% for conviction in convictions %}
+### Conviction: {{ conviction[:80] }}{% if conviction|length > 80 %}...{% endif %}
+
+**Expressed?** Yes / No / Partially
+
+**How:** _(describe where and how this conviction is expressed in the implementation)_
+
+**Deviations:** _(any deliberate departures, with justification citing another conviction)_
+
+{% endfor %}
+{% else %}
+_(no convictions recorded in reconstruction brief)_
+{% endif %}
+
+---
+
+## Constraint compliance
+
+> For each non-negotiable constraint: how does this implementation satisfy it?
+
+{% if constraints %}
+{% for constraint in constraints %}
+### {{ constraint.name }}
+
+**Rule:** {{ constraint.rule }}
+
+**Satisfied?** Yes / No / Conditionally
+
+**How:** _(describe the specific design or implementation that satisfies this constraint)_
+
+{% endfor %}
+{% else %}
+_(no constraints recorded in reconstruction brief)_
+{% endif %}
+
+---
+
+## Comparison rubric scores
+
+> For each dimension in the reconstruction brief: score and justify.
+
+{% if comparison_dimensions %}
+{% for dim in comparison_dimensions %}
+### {{ dim.name }}
+
+**Description:** {{ dim.description }}
+
+**Score:** [ ] Exceeds original  [ ] On par  [ ] Below original  [ ] Not assessed
+
+**Justification:** _(concrete evidence from the implementation)_
+
+{% endfor %}
+{% else %}
+_(no comparison dimensions recorded in reconstruction brief)_
+{% endif %}
+
+---
+
+## Should-question resolutions
+
+> For each item flagged as "should question": did you improve it or keep it?
+
+{% if should_question %}
+{% for item in should_question %}
+### {{ item[:80] }}{% if item|length > 80 %}...{% endif %}
+
+**Decision:** Improved / Kept as-is / Not applicable
+
+**Rationale:** _(if improved: what you did and which conviction supports it.
+If kept: why the original approach was correct.)_
+
+{% endfor %}
+{% else %}
+_(no should-question items in reconstruction brief)_
+{% endif %}
+
+---
+
+## Divergences from original
+
+> Significant implementation choices that differ from the original fingerprints.
+> These are not defects — they are the point of the exercise.
+
+_(list each significant divergence, the reasoning, and the conviction it expresses)_
+
+---
+
+## Summary verdict
+
+**Overall alignment with ideology:** Strong / Moderate / Weak
+
+**Recommended for:** Backport review / Stack porting / Leapfrog / Archive
+
+**Key insight for original team:** _(one paragraph — what the original can learn from this
+reconstruction, or what validates the original approach)_

@@ -1,0 +1,32 @@
+{% if era_id -%}
+---
+era: "{{ era_id }}"
+---
+
+{% endif -%}
+# {{ project_name }} — Phase {{ phase_id }}: {{ phase_title }}
+
+{% if prev_phase or next_phase -%}
+{% if prev_phase -%}
+← [Phase {{ prev_phase.id }}: {{ prev_phase.title }}](phase-{{ prev_phase.id }}.md)
+{%- endif -%}
+{% if prev_phase and next_phase %} | {% endif -%}
+{% if next_phase -%}
+[Phase {{ next_phase.id }}: {{ next_phase.title }}](phase-{{ next_phase.id }}.md) →
+{%- endif %}
+
+{% endif -%}
+## Goal
+
+{{ goal if goal else "— fill in the phase goal —" }}
+
+## Stories
+
+| ID | Title | Status |
+|----|-------|--------|
+
+---
+
+### CP-{{ phase_id }} Cold-eyes checklist
+
+— developer fills in after phase completion —

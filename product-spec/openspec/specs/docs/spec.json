@@ -1,0 +1,78 @@
+{
+  "module": "docs",
+  "summary": "The docs module is the authoritative source of truth for how the anchor project is built and evolved. It consists of three interlocking documents: architecture.md defines the canonical system design and invariants that all code must satisfy; phase-prompts.md contains the complete ordered build plan, decomposed into stories with acceptance criteria and instructions that drive the builder agent; checkpoints.md defines the phase-boundary gates \u2014 tagged milestones that require the full build gate, security audit, and intent review sequence to pass before the next phase begins. Together these documents act as a persistent contract between the human developer and the AI agents: architecture.md is the what-and-why, phase-prompts.md is the step-by-step how, and checkpoints.md is the when-is-it-done.",
+  "business_rules": [
+    "architecture.md must be read before any build or review task \u2014 it is the first input to every agent session and overrides any agent default behavior.",
+    "phase-prompts.md must be read in full by the build orchestrator before starting any story \u2014 no story may begin without the orchestrator having the complete phase context.",
+    "Each story in phase-prompts.md must have an explicit acceptance criterion; a story without one may not be started.",
+    "Checkpoints must only be tagged after all stories in the phase pass the full sequence: build gate, security audit, and intent review. Partial phase completion does not qualify.",
+    "architecture.md must reflect the actual implemented module structure, data flow, layer rules, and protected files at all times \u2014 it is a live spec, not aspirational design.",
+    "The canonical spec format defined in architecture.md (module, summary, business_rules, non_negotiables, tradeoffs, conflicts, lineage) is binding on all spec.json files produced by or consumed by the system.",
+    "phase-prompts.md stories are executed in order within a phase; a later story may not be started if an earlier story in the same phase has not passed its acceptance criterion.",
+    "checkpoints.md records the git tag command for each checkpoint so the tagging step is reproducible and unambiguous.",
+    "Developer Action gates in phase-prompts.md (marked with the gear symbol) require human confirmation before the build proceeds to the next phase \u2014 they are not skippable by the builder agent."
+  ],
+  "non_negotiables": [
+    "architecture.md must never be allowed to drift from the actual implementation \u2014 it is the source of truth and a diverged architecture doc is a CRITICAL integrity failure.",
+    "The hook architecture non-negotiable documented in architecture.md (hooks are thin relays only, no API calls, no direct spec writes) must never be contradicted or softened in any revision of the doc.",
+    "The append-only invariant for spec lineage and lessons.json must be explicitly stated in architecture.md and must never be removed from it.",
+    "phase-prompts.md must never be edited to retroactively change a story's acceptance criterion after that story has been completed \u2014 doing so breaks the audit trail of what was actually built.",
+    "Checkpoints in checkpoints.md must never be removed once created; they are permanent phase-boundary records.",
+    "The protected files list in architecture.md must stay in sync with the protected files list enforced in CLAUDE.md \u2014 a discrepancy between the two is a CRITICAL configuration error.",
+    "The layer rules table in architecture.md (hooks may not import from skills; skills may not call hooks) must never be relaxed without an explicit recorded architectural decision."
+  ],
+  "tradeoffs": [
+    {
+      "decision": "phase-prompts.md is a flat, ordered, human-readable file rather than a structured data format (YAML/JSON).",
+      "reason": "The build orchestrator is an LLM agent that reads natural language instructions; a structured format would require a parser and add indirection. Human developers also need to read and author stories directly.",
+      "accepted_cost": "Stories cannot be queried or manipulated programmatically without parsing Markdown, and the file grows linearly with no archival of completed phases."
+    },
+    {
+      "decision": "architecture.md is a single flat file covering the entire system rather than per-module architecture docs.",
+      "reason": "A single file ensures the build orchestrator and reviewer always have the full system context in one read, reducing the risk of an agent missing a cross-module invariant.",
+      "accepted_cost": "The file will grow large as the system expands; future phases may need to split it, which would require updating all agent prompts that reference it."
+    },
+    {
+      "decision": "checkpoints.md records only phase-level gates, not story-level completion records.",
+      "reason": "Story-level completion is tracked implicitly by git commit history and the build gate. Duplicating it in checkpoints.md would create a maintenance burden with no added enforcement.",
+      "accepted_cost": "There is no single document that gives a quick view of which individual stories are complete within a phase; that requires reading git log."
+    },
+    {
+      "decision": "anchor's own docs are hand-authored, not generated from the pairmode templates in skills/pairmode/templates/docs/.",
+      "reason": "Anchor's docs describe a unique, evolving system. Generating them from templates would add abstraction with no benefit and risk the canonical docs becoming stale if the template diverges.",
+      "accepted_cost": "anchor's own architecture.md, phase-prompts.md, and checkpoints.md must be manually kept consistent with the Jinja2 templates that generate equivalent files for downstream projects."
+    }
+  ],
+  "conflicts": [],
+  "lineage": [
+    {
+      "session_id": "0fac6655-0a31-4841-b1a9-8549cde560e7",
+      "summary": "",
+      "date": "2026-04-16",
+      "resume": "claude --resume 0fac6655-0a31-4841-b1a9-8549cde560e7",
+      "what_changed": "Specification and documentation of modular architecture, analyzing domain-admin-ui and routes modules within a 15-module product system",
+      "key_decisions": [
+        "Product is organized into 15 modular units, each with discrete rule sets and constraint requirements",
+        "domain-admin-ui is a React-based administrative web console for managing domain schema and operations",
+        "Multi-tenant domain model is foundational architecture for the product",
+        "Product migrated from Rust to TypeScript backend",
+        "Database migrated from MongoDB to PostgreSQL"
+      ]
+    },
+    {
+      "session_id": "a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "summary": "",
+      "date": "2026-04-19",
+      "resume": "claude --resume a3d48ab2-becb-4fe4-9d9d-75bce40de4d8",
+      "what_changed": "Add Linux support to Anchor plugin, test the implementation, open PR to original repo, and plan integration approach for TypeScript monorepo project.",
+      "key_decisions": [
+        "Manual skill execution via SKILL.md reading instead of automatic plugin-driven execution in current session",
+        "Create Linux support for Anchor plugin and contribute changes back via PR to original public repository",
+        "Update README to document Linux support",
+        "Push changes to private fork and open PR against original public repository",
+        "Install GitHub CLI (gh) for command-line PR operations"
+      ]
+    }
+  ],
+  "last_updated": "2026-04-19"
+}
